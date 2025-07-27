@@ -1,0 +1,75 @@
+[workspace]
+members = ["crates/shared"]
+resolver = "2"
+
+[workspace.dependencies]
+# Web framework and async runtime
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Database
+sqlx = { version = "0.7", features = [
+  "runtime-tokio-rustls",
+  "postgres",
+  "uuid",
+  "chrono",
+  "json",
+] }
+sea-orm = { version = "0.12", features = [
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+] }
+
+# Serialization and JSON
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# WebSocket
+tokio-tungstenite = { version = "0.21", features = ["rustls-tls-webpki-roots"] }
+socketioxide = "0.10"
+
+# Authentication and security
+jsonwebtoken = "9.0"
+argon2 = "0.5"
+
+# Utilities
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.21"
+thiserror = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"
+validator = { version = "0.16", features = ["derive"] }
+
+# Desktop automation (for bytebotd-rs)
+enigo = "0.2"
+screenshots = "0.5"
+image = "0.24"
+
+# Testing
+mockall = "0.12"
+tokio-test = "0.4"
+
+# Development tools
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.test]
+opt-level = 1
