@@ -1,0 +1,55 @@
+[package]
+name = "bytebotd-rs"
+version = "0.1.0"
+edition = "2021"
+description = "ByteBot desktop automation daemon written in Rust"
+authors = ["ByteBot Team"]
+
+[[bin]]
+name = "bytebotd-rs"
+path = "src/main.rs"
+
+[dependencies]
+# Web framework and async runtime
+axum = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Desktop automation
+enigo = { workspace = true }
+screenshots = { workspace = true }
+image = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+base64 = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Shared types
+bytebot-shared-rs = { path = "../bytebot-shared-rs" }
+
+# Configuration
+envy = "0.4"
+dotenvy = "0.15"
+
+# Platform-specific dependencies
+[target.'cfg(unix)'.dependencies]
+x11 = "2.21"
+
+[dev-dependencies]
+mockall = { workspace = true }
+tokio-test = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "automation_benchmarks"
+harness = false

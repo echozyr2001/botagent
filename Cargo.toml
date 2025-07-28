@@ -1,26 +1,31 @@
 [workspace]
-members = ["crates/shared", "crates/agent"]
+members = [
+    "packages/bytebot-agent-rs",
+    "packages/bytebotd-rs",
+    "packages/bytebot-shared-rs",
+]
 resolver = "2"
 
 [workspace.dependencies]
 # Web framework and async runtime
 axum = "0.7"
 tokio = { version = "1.0", features = ["full"] }
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tokio-util = "0.7"
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "request-id"] }
 
 # Database
 sqlx = { version = "0.7", features = [
-  "runtime-tokio-rustls",
-  "postgres",
-  "uuid",
-  "chrono",
-  "json",
+    "runtime-tokio-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "json",
 ] }
 sea-orm = { version = "0.12", features = [
-  "sqlx-postgres",
-  "runtime-tokio-rustls",
-  "macros",
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
 ] }
 
 # Serialization and JSON
@@ -48,6 +53,10 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 async-trait = "0.1"
 validator = { version = "0.16", features = ["derive"] }
+
+# Configuration
+envy = "0.4"
+dotenvy = "0.15"
 
 # Desktop automation (for bytebotd-rs)
 enigo = "0.2"
