@@ -1,16 +1,14 @@
-use axum::{
-    extract::State,
-    response::Json,
-};
-use serde_json::{json, Value};
 use std::sync::Arc;
+
+use axum::{extract::State, response::Json};
+use bytebot_shared_rs::types::computer_action::{Application, ComputerAction, Coordinates, Press};
+use serde_json::{json, Value};
 use tracing::{debug, info};
 
 use crate::{
     automation::{AutomationService, ComputerAutomation},
     error::ServiceError,
 };
-use bytebot_shared_rs::types::computer_action::{ComputerAction, Coordinates, Application, Press};
 
 /// Handle computer automation actions
 pub async fn handle_computer_action(
@@ -44,11 +42,18 @@ pub async fn handle_computer_action(
             })
         }
 
-        ComputerAction::ClickMouse { coordinates, button, click_count, .. } => {
+        ComputerAction::ClickMouse {
+            coordinates,
+            button,
+            click_count,
+            ..
+        } => {
             let coords = coordinates.unwrap_or(Coordinates { x: 0, y: 0 });
-            debug!("Clicking mouse at ({}, {}) with {:?} button, {} times", 
-                   coords.x, coords.y, button, click_count);
-            
+            debug!(
+                "Clicking mouse at ({}, {}) with {:?} button, {} times",
+                coords.x, coords.y, button, click_count
+            );
+
             // Perform multiple clicks if requested
             for i in 0..click_count {
                 automation_service.click_mouse(coords, button).await?;
@@ -57,7 +62,7 @@ pub async fn handle_computer_action(
                     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 }
             }
-            
+
             json!({
                 "success": true,
                 "action": "click_mouse",
@@ -71,7 +76,7 @@ pub async fn handle_computer_action(
 
         ComputerAction::TypeText { text, delay, .. } => {
             debug!("Typing text: {} (delay: {:?}ms)", text, delay);
-            
+
             if let Some(delay_ms) = delay {
                 // Type with delay between characters
                 for ch in text.chars() {
@@ -83,7 +88,7 @@ pub async fn handle_computer_action(
             } else {
                 automation_service.type_text(&text).await?;
             }
-            
+
             json!({
                 "success": true,
                 "action": "type_text",
@@ -96,7 +101,7 @@ pub async fn handle_computer_action(
 
         ComputerAction::PressKeys { keys, press } => {
             debug!("Pressing keys: {:?} with press type: {:?}", keys, press);
-            
+
             match press {
                 Press::Up | Press::Down => {
                     // For press/release, handle each key individually
@@ -107,7 +112,7 @@ pub async fn handle_computer_action(
                     }
                 }
             }
-            
+
             json!({
                 "success": true,
                 "action": "press_keys",
@@ -120,7 +125,7 @@ pub async fn handle_computer_action(
 
         ComputerAction::TypeKeys { keys, delay } => {
             debug!("Typing keys: {:?} (delay: {:?}ms)", keys, delay);
-            
+
             if let Some(delay_ms) = delay {
                 // Type with delay between keys
                 for key in &keys {
@@ -132,7 +137,7 @@ pub async fn handle_computer_action(
             } else {
                 automation_service.press_keys(&keys).await?;
             }
-            
+
             json!({
                 "success": true,
                 "action": "type_keys",
@@ -198,61 +203,77 @@ pub async fn handle_computer_action(
             // This would need to be implemented in the mouse service
             return Err(ServiceError::Automation(
                 crate::error::AutomationError::UnsupportedOperation(
-                    "Cursor position not yet implemented".to_string()
-                )
+                    "Cursor position not yet implemented".to_string(),
+                ),
             ));
         }
 
-        ComputerAction::Scroll { coordinates, direction, scroll_count, .. } => {
-            debug!("Scrolling {:?} {} times at coordinates: {:?}", 
-                   direction, scroll_count, coordinates);
-            
+        ComputerAction::Scroll {
+            coordinates,
+            direction,
+            scroll_count,
+            ..
+        } => {
+            debug!(
+                "Scrolling {:?} {} times at coordinates: {:?}",
+                direction, scroll_count, coordinates
+            );
+
             // This would need to be implemented in the mouse service
             return Err(ServiceError::Automation(
                 crate::error::AutomationError::UnsupportedOperation(
-                    "Scroll action not yet implemented".to_string()
-                )
+                    "Scroll action not yet implemented".to_string(),
+                ),
             ));
         }
 
         ComputerAction::TraceMouse { path, .. } => {
             debug!("Tracing mouse along path with {} points", path.len());
-            
+
             // This would need to be implemented in the mouse service
             return Err(ServiceError::Automation(
                 crate::error::AutomationError::UnsupportedOperation(
-                    "Trace mouse action not yet implemented".to_string()
-                )
+                    "Trace mouse action not yet implemented".to_string(),
+                ),
             ));
         }
 
-        ComputerAction::PressMouse { coordinates, button, press } => {
-            debug!("Pressing mouse button {:?} with press type {:?} at coordinates: {:?}", 
-                   button, press, coordinates);
-            
+        ComputerAction::PressMouse {
+            coordinates,
+            button,
+            press,
+        } => {
+            debug!(
+                "Pressing mouse button {:?} with press type {:?} at coordinates: {:?}",
+                button, press, coordinates
+            );
+
             // This would need to be implemented in the mouse service
             return Err(ServiceError::Automation(
                 crate::error::AutomationError::UnsupportedOperation(
-                    "Press mouse action not yet implemented".to_string()
-                )
+                    "Press mouse action not yet implemented".to_string(),
+                ),
             ));
         }
 
         ComputerAction::DragMouse { path, button, .. } => {
-            debug!("Dragging mouse along path with {} points using {:?} button", 
-                   path.len(), button);
-            
+            debug!(
+                "Dragging mouse along path with {} points using {:?} button",
+                path.len(),
+                button
+            );
+
             // This would need to be implemented in the mouse service
             return Err(ServiceError::Automation(
                 crate::error::AutomationError::UnsupportedOperation(
-                    "Drag mouse action not yet implemented".to_string()
-                )
+                    "Drag mouse action not yet implemented".to_string(),
+                ),
             ));
         }
 
         ComputerAction::Application { application } => {
             debug!("Switching to application: {:?}", application);
-            
+
             let app_name = match application {
                 Application::Firefox => "firefox",
                 Application::OnePassword => "1password",
@@ -262,9 +283,9 @@ pub async fn handle_computer_action(
                 Application::Desktop => "desktop",
                 Application::Directory => "directory",
             };
-            
+
             automation_service.applications.switch_to(app_name).await?;
-            
+
             json!({
                 "success": true,
                 "action": "application",
@@ -285,16 +306,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_screenshot_action() {
-        let automation_service = Arc::new(
-            AutomationService::new().expect("Failed to create automation service")
-        );
-        
+        let automation_service =
+            Arc::new(AutomationService::new().expect("Failed to create automation service"));
+
         let action = ComputerAction::Screenshot;
-        let result = handle_computer_action(
-            State(automation_service),
-            Json(action)
-        ).await;
-        
+        let result = handle_computer_action(State(automation_service), Json(action)).await;
+
         // In headless environments or CI, screenshot might fail
         // This is expected behavior, so we handle both cases
         match result {
@@ -314,20 +331,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_move_mouse_action() {
-        let automation_service = Arc::new(
-            AutomationService::new().expect("Failed to create automation service")
-        );
-        
+        let automation_service =
+            Arc::new(AutomationService::new().expect("Failed to create automation service"));
+
         let coordinates = Coordinates { x: 100, y: 200 };
         let action = ComputerAction::MoveMouse { coordinates };
-        
-        let result = handle_computer_action(
-            State(automation_service),
-            Json(action)
-        ).await;
-        
+
+        let result = handle_computer_action(State(automation_service), Json(action)).await;
+
         assert!(result.is_ok(), "Move mouse action should succeed");
-        
+
         let response = result.unwrap().0;
         assert_eq!(response["success"], true);
         assert_eq!(response["action"], "move_mouse");

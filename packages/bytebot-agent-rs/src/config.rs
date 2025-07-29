@@ -1,5 +1,6 @@
-use serde::Deserialize;
 use std::env;
+
+use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -33,11 +34,11 @@ pub enum ConfigError {
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
         dotenvy::dotenv().ok(); // Load .env file if present
-        
+
         let config = envy::from_env::<Config>()?;
         Ok(config)
     }
-    
+
     pub fn database_url(&self) -> &str {
         &self.database_url
     }
@@ -70,9 +71,7 @@ impl Default for Config {
                     .unwrap_or_else(|_| "9991".to_string())
                     .parse()
                     .unwrap_or(9991),
-                workers: env::var("WORKERS")
-                    .ok()
-                    .and_then(|w| w.parse().ok()),
+                workers: env::var("WORKERS").ok().and_then(|w| w.parse().ok()),
             },
         }
     }

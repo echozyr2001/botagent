@@ -1,9 +1,11 @@
-use crate::error::AutomationError;
-use base64::{engine::general_purpose, Engine as _};
-use image::{ImageFormat, RgbaImage, DynamicImage};
-use screenshots::Screen;
 use std::io::Cursor;
+
+use base64::{engine::general_purpose, Engine as _};
+use image::{DynamicImage, ImageFormat, RgbaImage};
+use screenshots::Screen;
 use tracing::{debug, error, info};
+
+use crate::error::AutomationError;
 
 #[derive(Debug, Clone)]
 pub struct ScreenService {
@@ -22,7 +24,10 @@ impl ScreenService {
             ));
         }
 
-        info!("Initialized screen service with {} screen(s)", screens.len());
+        info!(
+            "Initialized screen service with {} screen(s)",
+            screens.len()
+        );
         Ok(Self { screens })
     }
 
@@ -31,19 +36,18 @@ impl ScreenService {
         debug!("Taking screenshot of primary screen");
 
         // Use the first screen as primary
-        let screen = self.screens.first().ok_or_else(|| {
-            AutomationError::ScreenshotFailed("No screens available".to_string())
-        })?;
+        let screen = self
+            .screens
+            .first()
+            .ok_or_else(|| AutomationError::ScreenshotFailed("No screens available".to_string()))?;
 
         // Capture the screen in a blocking task to avoid blocking the async runtime
-        let screen_clone = screen.clone();
-        let image_result = tokio::task::spawn_blocking(move || {
-            screen_clone.capture()
-        })
-        .await
-        .map_err(|e| {
-            AutomationError::ScreenshotFailed(format!("Screenshot task failed: {e}"))
-        })?;
+        let screen_clone = *screen;
+        let image_result = tokio::task::spawn_blocking(move || screen_clone.capture())
+            .await
+            .map_err(|e| {
+                AutomationError::ScreenshotFailed(format!("Screenshot task failed: {e}"))
+            })?;
 
         let image = image_result.map_err(|e| {
             error!("Screenshot capture failed: {}", e);
@@ -55,21 +59,22 @@ impl ScreenService {
     }
 
     /// Take a screenshot of a specific screen by index
-    pub async fn take_screenshot_of_screen(&self, screen_index: usize) -> Result<String, AutomationError> {
+    pub async fn take_screenshot_of_screen(
+        &self,
+        screen_index: usize,
+    ) -> Result<String, AutomationError> {
         debug!("Taking screenshot of screen {}", screen_index);
 
         let screen = self.screens.get(screen_index).ok_or_else(|| {
             AutomationError::ScreenshotFailed(format!("Screen {screen_index} not found"))
         })?;
 
-        let screen_clone = screen.clone();
-        let image_result = tokio::task::spawn_blocking(move || {
-            screen_clone.capture()
-        })
-        .await
-        .map_err(|e| {
-            AutomationError::ScreenshotFailed(format!("Screenshot task failed: {e}"))
-        })?;
+        let screen_clone = *screen;
+        let image_result = tokio::task::spawn_blocking(move || screen_clone.capture())
+            .await
+            .map_err(|e| {
+                AutomationError::ScreenshotFailed(format!("Screenshot task failed: {e}"))
+            })?;
 
         let image = image_result.map_err(|e| {
             error!("Screenshot capture failed: {}", e);
@@ -99,18 +104,18 @@ impl ScreenService {
     async fn image_to_base64(&self, image: screenshots::Image) -> Result<String, AutomationError> {
         tokio::task::spawn_blocking(move || {
             // Convert screenshots::Image to DynamicImage
-            let rgba_image = RgbaImage::from_raw(
-                image.width(),
-                image.height(),
-                image.buffer().to_vec(),
-            ).ok_or_else(|| {
-                AutomationError::ScreenshotFailed("Failed to create RGBA image from raw data".to_string())
-            })?;
+            let rgba_image =
+                RgbaImage::from_raw(image.width(), image.height(), image.buffer().to_vec())
+                    .ok_or_else(|| {
+                        AutomationError::ScreenshotFailed(
+                            "Failed to create RGBA image from raw data".to_string(),
+                        )
+                    })?;
 
             let dynamic_image = DynamicImage::ImageRgba8(rgba_image);
-            
+
             let mut buffer = Cursor::new(Vec::new());
-            
+
             // Convert to PNG format
             dynamic_image
                 .write_to(&mut buffer, ImageFormat::Png)
@@ -146,32 +151,44 @@ mod tests {
     #[tokio::test]
     async fn test_screen_service_creation() {
         let result = ScreenService::new();
-        assert!(result.is_ok(), "Screen service should initialize successfully");
-        
+        assert!(
+            result.is_ok(),
+            "Screen service should initialize successfully"
+        );
+
         let service = result.unwrap();
-        assert!(!service.screens.is_empty(), "Should have at least one screen");
+        assert!(
+            !service.screens.is_empty(),
+            "Should have at least one screen"
+        );
     }
 
     #[tokio::test]
     async fn test_get_screen_info() {
         let service = ScreenService::new().expect("Failed to create screen service");
         let screen_info = service.get_screen_info();
-        
+
         assert!(!screen_info.is_empty(), "Should have screen information");
-        assert!(screen_info.iter().any(|s| s.is_primary), "Should have a primary screen");
+        assert!(
+            screen_info.iter().any(|s| s.is_primary),
+            "Should have a primary screen"
+        );
     }
 
     #[tokio::test]
     async fn test_take_screenshot() {
         let service = ScreenService::new().expect("Failed to create screen service");
         let result = service.take_screenshot().await;
-        
+
         // In headless environments or CI, screenshot might fail
         // This is expected behavior, so we handle both cases
         match result {
             Ok(base64_data) => {
-                assert!(!base64_data.is_empty(), "Screenshot data should not be empty");
-                
+                assert!(
+                    !base64_data.is_empty(),
+                    "Screenshot data should not be empty"
+                );
+
                 // Verify it's valid base64
                 let decoded = general_purpose::STANDARD.decode(&base64_data);
                 assert!(decoded.is_ok(), "Screenshot should be valid base64");

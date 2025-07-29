@@ -1,5 +1,6 @@
-use serde::Deserialize;
 use std::net::SocketAddr;
+
+use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -41,7 +42,7 @@ impl Default for Config {
 impl Config {
     pub fn from_env() -> Result<Self, envy::Error> {
         let mut config = envy::from_env::<Config>().unwrap_or_default();
-        
+
         // Override with environment variables if present
         if let Ok(host) = std::env::var("BYTEBOTD_HOST") {
             config.server.host = host;
@@ -49,10 +50,10 @@ impl Config {
         if let Ok(port) = std::env::var("BYTEBOTD_PORT") {
             config.server.port = port.parse().unwrap_or(9990);
         }
-        
+
         Ok(config)
     }
-    
+
     pub fn socket_addr(&self) -> SocketAddr {
         format!("{}:{}", self.server.host, self.server.port)
             .parse()

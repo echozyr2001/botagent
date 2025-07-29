@@ -1,14 +1,14 @@
-use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{Pool, Postgres, Row};
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn};
-use uuid::Uuid;
 
+use async_trait::async_trait;
 use bytebot_shared_rs::types::{
     api::{CreateTaskDto, PaginationParams, UpdateTaskDto},
     task::{Role, Task, TaskPriority, TaskStatus, TaskType},
 };
+use chrono::{DateTime, Utc};
+use sqlx::{Pool, Postgres, Row};
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 use super::DatabaseError;
 
@@ -875,9 +875,10 @@ impl TaskRepositoryTrait for TaskRepository {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::Duration;
     use mockall::mock;
+
+    use super::*;
 
     // Mock implementation for testing
     mock! {

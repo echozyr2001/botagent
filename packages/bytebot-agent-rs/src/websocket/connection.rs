@@ -1,5 +1,5 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
+
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
@@ -30,11 +30,11 @@ impl ConnectionManager {
     /// Handle client disconnection
     pub async fn handle_disconnection(&self, socket_id: String) {
         info!("Client disconnected: {}", socket_id);
-        
+
         let mut connections = self.connections.write().await;
         if let Some(task_rooms) = connections.remove(&socket_id) {
             drop(connections); // Release the lock before acquiring rooms lock
-            
+
             // Remove the socket from all rooms it was in
             let mut rooms = self.rooms.write().await;
             for task_id in task_rooms {
@@ -52,9 +52,9 @@ impl ConnectionManager {
     /// Join a client to a task room
     pub async fn join_task(&self, socket_id: String, task_id: String) -> Result<(), String> {
         debug!("Client {} joining task {}", socket_id, task_id);
-        
+
         let room_key = format!("task_{task_id}");
-        
+
         // Add task to client's room list
         {
             let mut connections = self.connections.write().await;
@@ -67,15 +67,16 @@ impl ConnectionManager {
                 return Err("Socket not found".to_string());
             }
         }
-        
+
         // Add client to room
         {
             let mut rooms = self.rooms.write().await;
-            rooms.entry(room_key.clone())
+            rooms
+                .entry(room_key.clone())
                 .or_insert_with(Vec::new)
                 .push(socket_id.clone());
         }
-        
+
         info!("Client {} joined {}", socket_id, room_key);
         Ok(())
     }
@@ -83,9 +84,9 @@ impl ConnectionManager {
     /// Remove a client from a task room
     pub async fn leave_task(&self, socket_id: String, task_id: String) -> Result<(), String> {
         debug!("Client {} leaving task {}", socket_id, task_id);
-        
+
         let room_key = format!("task_{task_id}");
-        
+
         // Remove task from client's room list
         {
             let mut connections = self.connections.write().await;
@@ -96,7 +97,7 @@ impl ConnectionManager {
                 return Err("Socket not found".to_string());
             }
         }
-        
+
         // Remove client from room
         {
             let mut rooms = self.rooms.write().await;
@@ -108,7 +109,7 @@ impl ConnectionManager {
                 }
             }
         }
-        
+
         info!("Client {} left {}", socket_id, room_key);
         Ok(())
     }
@@ -130,7 +131,7 @@ impl ConnectionManager {
     pub async fn get_stats(&self) -> ConnectionStats {
         let connections = self.connections.read().await;
         let rooms = self.rooms.read().await;
-        
+
         ConnectionStats {
             total_connections: connections.len(),
             total_rooms: rooms.len(),
@@ -156,7 +157,6 @@ pub struct ConnectionStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     fn create_test_socket_id() -> String {
         // Create a mock socket ID for testing
@@ -219,8 +219,14 @@ mod tests {
         manager.handle_connection(socket2.clone()).await;
 
         // Both join the same room
-        manager.join_task(socket1.clone(), task_id.clone()).await.unwrap();
-        manager.join_task(socket2.clone(), task_id.clone()).await.unwrap();
+        manager
+            .join_task(socket1.clone(), task_id.clone())
+            .await
+            .unwrap();
+        manager
+            .join_task(socket2.clone(), task_id.clone())
+            .await
+            .unwrap();
 
         // Check both are in the room
         let room_sockets = manager.get_room_sockets(&task_id).await;
@@ -229,7 +235,10 @@ mod tests {
         assert!(room_sockets.contains(&socket2));
 
         // One leaves
-        manager.leave_task(socket1.clone(), task_id.clone()).await.unwrap();
+        manager
+            .leave_task(socket1.clone(), task_id.clone())
+            .await
+            .unwrap();
         let room_sockets = manager.get_room_sockets(&task_id).await;
         assert_eq!(room_sockets.len(), 1);
         assert_eq!(room_sockets[0], socket2);

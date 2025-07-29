@@ -1,13 +1,12 @@
 use async_trait::async_trait;
+use bytebot_shared_rs::types::{
+    api::PaginationParams,
+    user::{Account, Session, User, Verification},
+};
 use chrono::{DateTime, Utc};
 use sqlx::{Pool, Postgres, Row};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
-
-use bytebot_shared_rs::types::{
-    api::PaginationParams,
-    user::{User, Session, Account, Verification},
-};
 
 use super::DatabaseError;
 
@@ -79,7 +78,11 @@ pub trait UserRepositoryTrait: Send + Sync {
     async fn create_user(&self, dto: &CreateUserDto) -> Result<User, DatabaseError>;
     async fn get_user_by_id(&self, id: &str) -> Result<Option<User>, DatabaseError>;
     async fn get_user_by_email(&self, email: &str) -> Result<Option<User>, DatabaseError>;
-    async fn update_user(&self, id: &str, dto: &UpdateUserDto) -> Result<Option<User>, DatabaseError>;
+    async fn update_user(
+        &self,
+        id: &str,
+        dto: &UpdateUserDto,
+    ) -> Result<Option<User>, DatabaseError>;
     async fn delete_user(&self, id: &str) -> Result<bool, DatabaseError>;
     async fn list_users(
         &self,
@@ -98,7 +101,11 @@ pub trait UserRepositoryTrait: Send + Sync {
 
     // Account operations
     async fn create_account(&self, dto: &CreateAccountDto) -> Result<Account, DatabaseError>;
-    async fn get_account_by_provider(&self, user_id: &str, provider_id: &str) -> Result<Option<Account>, DatabaseError>;
+    async fn get_account_by_provider(
+        &self,
+        user_id: &str,
+        provider_id: &str,
+    ) -> Result<Option<Account>, DatabaseError>;
     async fn get_accounts_by_user_id(&self, user_id: &str) -> Result<Vec<Account>, DatabaseError>;
     async fn update_account_tokens(
         &self,
@@ -108,12 +115,25 @@ pub trait UserRepositoryTrait: Send + Sync {
         access_token_expires_at: Option<DateTime<Utc>>,
         refresh_token_expires_at: Option<DateTime<Utc>>,
     ) -> Result<Option<Account>, DatabaseError>;
-    async fn update_account_password(&self, id: &str, password_hash: &str) -> Result<Option<Account>, DatabaseError>;
+    async fn update_account_password(
+        &self,
+        id: &str,
+        password_hash: &str,
+    ) -> Result<Option<Account>, DatabaseError>;
     async fn delete_account(&self, id: &str) -> Result<bool, DatabaseError>;
 
     // Verification operations
-    async fn create_verification(&self, identifier: &str, value: &str, expires_at: DateTime<Utc>) -> Result<Verification, DatabaseError>;
-    async fn get_verification(&self, identifier: &str, value: &str) -> Result<Option<Verification>, DatabaseError>;
+    async fn create_verification(
+        &self,
+        identifier: &str,
+        value: &str,
+        expires_at: DateTime<Utc>,
+    ) -> Result<Verification, DatabaseError>;
+    async fn get_verification(
+        &self,
+        identifier: &str,
+        value: &str,
+    ) -> Result<Option<Verification>, DatabaseError>;
     async fn delete_verification(&self, id: &str) -> Result<bool, DatabaseError>;
     async fn delete_expired_verifications(&self) -> Result<u64, DatabaseError>;
 }
@@ -216,7 +236,8 @@ impl UserRepository {
 
         Ok(())
     }
-}#[async_trait]
+}
+#[async_trait]
 impl UserRepositoryTrait for UserRepository {
     async fn create_user(&self, dto: &CreateUserDto) -> Result<User, DatabaseError> {
         debug!("Creating new user with email: {}", dto.email);
@@ -379,7 +400,11 @@ impl UserRepositoryTrait for UserRepository {
         Ok(user)
     }
 
-    async fn update_user(&self, id: &str, dto: &UpdateUserDto) -> Result<Option<User>, DatabaseError> {
+    async fn update_user(
+        &self,
+        id: &str,
+        dto: &UpdateUserDto,
+    ) -> Result<Option<User>, DatabaseError> {
         debug!("Updating user with ID: {}", id);
 
         // Get current user to preserve existing values
@@ -463,12 +488,13 @@ impl UserRepositoryTrait for UserRepository {
         };
 
         Ok(user)
-    }    async fn delete_user(&self, id: &str) -> Result<bool, DatabaseError> {
+    }
+    async fn delete_user(&self, id: &str) -> Result<bool, DatabaseError> {
         debug!("Deleting user with ID: {}", id);
 
         // First delete related sessions and accounts (cascade delete)
         self.delete_user_sessions(id).await?;
-        
+
         let result = sqlx::query(r#"DELETE FROM "User" WHERE id = $1"#)
             .bind(id)
             .execute(&self.pool)
@@ -669,7 +695,8 @@ impl UserRepositoryTrait for UserRepository {
 
         info!("Successfully created session with ID: {}", session.id);
         Ok(session)
-    }    async fn get_session_by_token(&self, token: &str) -> Result<Option<Session>, DatabaseError> {
+    }
+    async fn get_session_by_token(&self, token: &str) -> Result<Option<Session>, DatabaseError> {
         debug!("Fetching session by token");
 
         let row = sqlx::query(
@@ -819,13 +846,19 @@ impl UserRepositoryTrait for UserRepository {
             })?;
 
         let deleted_count = result.rows_affected();
-        info!("Successfully deleted {} sessions for user {}", deleted_count, user_id);
+        info!(
+            "Successfully deleted {} sessions for user {}",
+            deleted_count, user_id
+        );
         Ok(deleted_count)
     }
 
     // Account operations
     async fn create_account(&self, dto: &CreateAccountDto) -> Result<Account, DatabaseError> {
-        debug!("Creating new account for user: {} with provider: {}", dto.user_id, dto.provider_id);
+        debug!(
+            "Creating new account for user: {} with provider: {}",
+            dto.user_id, dto.provider_id
+        );
 
         let account_id = Uuid::new_v4().to_string();
         let now = Utc::now();
@@ -892,8 +925,16 @@ impl UserRepositoryTrait for UserRepository {
 
         info!("Successfully created account with ID: {}", account.id);
         Ok(account)
-    }    async fn get_account_by_provider(&self, user_id: &str, provider_id: &str) -> Result<Option<Account>, DatabaseError> {
-        debug!("Fetching account for user {} with provider {}", user_id, provider_id);
+    }
+    async fn get_account_by_provider(
+        &self,
+        user_id: &str,
+        provider_id: &str,
+    ) -> Result<Option<Account>, DatabaseError> {
+        debug!(
+            "Fetching account for user {} with provider {}",
+            user_id, provider_id
+        );
 
         let row = sqlx::query(
             r#"
@@ -920,13 +961,19 @@ impl UserRepositoryTrait for UserRepository {
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| {
-            error!("Failed to fetch account for user {} with provider {}: {}", user_id, provider_id, e);
+            error!(
+                "Failed to fetch account for user {} with provider {}: {}",
+                user_id, provider_id, e
+            );
             DatabaseError::QueryError(e)
         })?;
 
         let account = match row {
             Some(row) => {
-                debug!("Found account for user {} with provider {}", user_id, provider_id);
+                debug!(
+                    "Found account for user {} with provider {}",
+                    user_id, provider_id
+                );
                 Some(Account {
                     id: row.get("id"),
                     user_id: row.get("userId"),
@@ -944,7 +991,10 @@ impl UserRepositoryTrait for UserRepository {
                 })
             }
             None => {
-                debug!("No account found for user {} with provider {}", user_id, provider_id);
+                debug!(
+                    "No account found for user {} with provider {}",
+                    user_id, provider_id
+                );
                 None
             }
         };
@@ -1089,7 +1139,11 @@ impl UserRepositoryTrait for UserRepository {
         Ok(account)
     }
 
-    async fn update_account_password(&self, id: &str, password_hash: &str) -> Result<Option<Account>, DatabaseError> {
+    async fn update_account_password(
+        &self,
+        id: &str,
+        password_hash: &str,
+    ) -> Result<Option<Account>, DatabaseError> {
         debug!("Updating password for account: {}", id);
 
         let now = Utc::now();
@@ -1175,8 +1229,13 @@ impl UserRepositoryTrait for UserRepository {
         }
 
         Ok(deleted)
-    }    // Verification operations
-    async fn create_verification(&self, identifier: &str, value: &str, expires_at: DateTime<Utc>) -> Result<Verification, DatabaseError> {
+    } // Verification operations
+    async fn create_verification(
+        &self,
+        identifier: &str,
+        value: &str,
+        expires_at: DateTime<Utc>,
+    ) -> Result<Verification, DatabaseError> {
         debug!("Creating verification for identifier: {}", identifier);
 
         let verification_id = Uuid::new_v4().to_string();
@@ -1219,11 +1278,18 @@ impl UserRepositoryTrait for UserRepository {
             updated_at: row.get("updatedAt"),
         };
 
-        info!("Successfully created verification with ID: {}", verification.id);
+        info!(
+            "Successfully created verification with ID: {}",
+            verification.id
+        );
         Ok(verification)
     }
 
-    async fn get_verification(&self, identifier: &str, value: &str) -> Result<Option<Verification>, DatabaseError> {
+    async fn get_verification(
+        &self,
+        identifier: &str,
+        value: &str,
+    ) -> Result<Option<Verification>, DatabaseError> {
         debug!("Fetching verification for identifier: {}", identifier);
 
         let row = sqlx::query(
@@ -1244,7 +1310,10 @@ impl UserRepositoryTrait for UserRepository {
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| {
-            error!("Failed to fetch verification for identifier {}: {}", identifier, e);
+            error!(
+                "Failed to fetch verification for identifier {}: {}",
+                identifier, e
+            );
             DatabaseError::QueryError(e)
         })?;
 
@@ -1305,7 +1374,10 @@ impl UserRepositoryTrait for UserRepository {
             })?;
 
         let deleted_count = result.rows_affected();
-        info!("Successfully deleted {} expired verifications", deleted_count);
+        info!(
+            "Successfully deleted {} expired verifications",
+            deleted_count
+        );
         Ok(deleted_count)
     }
 }

@@ -1,14 +1,16 @@
 #[cfg(test)]
 mod tests {
-    use crate::database::{
-        user_repository::{
-            CreateAccountDto, CreateSessionDto, CreateUserDto, UpdateUserDto, UserRepository, UserRepositoryTrait,
-        },
-        tests::{cleanup_test_data, create_test_pool},
-        DatabaseError,
-    };
     use bytebot_shared_rs::types::api::PaginationParams;
     use chrono::{Duration, Utc};
+
+    use crate::database::{
+        tests::{cleanup_test_data, create_test_pool},
+        user_repository::{
+            CreateAccountDto, CreateSessionDto, CreateUserDto, UpdateUserDto, UserRepository,
+            UserRepositoryTrait,
+        },
+        DatabaseError,
+    };
 
     #[tokio::test]
     async fn test_create_user() {
@@ -31,7 +33,10 @@ mod tests {
         assert_eq!(user.email, "test@example.com");
         assert_eq!(user.name, Some("Test User".to_string()));
         assert!(user.email_verified);
-        assert_eq!(user.image, Some("https://example.com/avatar.jpg".to_string()));
+        assert_eq!(
+            user.image,
+            Some("https://example.com/avatar.jpg".to_string())
+        );
 
         cleanup_test_data(&pool).await;
     }
@@ -53,7 +58,7 @@ mod tests {
 
         let result = repo.create_user(&dto).await;
         assert!(result.is_err());
-        
+
         if let Err(DatabaseError::ValidationError(msg)) = result {
             assert!(msg.contains("Invalid email format"));
         } else {
@@ -113,7 +118,7 @@ mod tests {
 
         let result = repo.create_user(&dto2).await;
         assert!(result.is_err());
-        
+
         if let Err(DatabaseError::ValidationError(msg)) = result {
             assert!(msg.contains("already exists"));
         } else {
@@ -146,7 +151,7 @@ mod tests {
 
         let user = result.unwrap();
         assert!(user.is_some());
-        
+
         let user = user.unwrap();
         assert_eq!(user.id, created_user.id);
         assert_eq!(user.email, "test@example.com");
@@ -184,7 +189,7 @@ mod tests {
 
         let user = result.unwrap();
         assert!(user.is_some());
-        
+
         let user = user.unwrap();
         assert_eq!(user.id, created_user.id);
         assert_eq!(user.email, "test@example.com");
@@ -231,13 +236,16 @@ mod tests {
 
         let updated_user = result.unwrap();
         assert!(updated_user.is_some());
-        
+
         let updated_user = updated_user.unwrap();
         assert_eq!(updated_user.id, created_user.id);
         assert_eq!(updated_user.name, Some("Updated Name".to_string()));
         assert_eq!(updated_user.email, "updated@example.com");
         assert!(updated_user.email_verified);
-        assert_eq!(updated_user.image, Some("https://example.com/new-avatar.jpg".to_string()));
+        assert_eq!(
+            updated_user.image,
+            Some("https://example.com/new-avatar.jpg".to_string())
+        );
         assert!(updated_user.updated_at > created_user.updated_at);
 
         cleanup_test_data(&pool).await;
@@ -276,7 +284,8 @@ mod tests {
         assert!(!result.unwrap());
 
         cleanup_test_data(&pool).await;
-    }    #[tokio::test]
+    }
+    #[tokio::test]
     async fn test_verify_user_email() {
         let pool = create_test_pool().await;
         cleanup_test_data(&pool).await;
@@ -300,7 +309,7 @@ mod tests {
 
         let verified_user = result.unwrap();
         assert!(verified_user.is_some());
-        
+
         let verified_user = verified_user.unwrap();
         assert_eq!(verified_user.id, created_user.id);
         assert!(verified_user.email_verified);
@@ -324,7 +333,10 @@ mod tests {
             image: None,
         };
 
-        let user = repo.create_user(&user_dto).await.expect("Failed to create user");
+        let user = repo
+            .create_user(&user_dto)
+            .await
+            .expect("Failed to create user");
 
         // Create a session
         let expires_at = Utc::now() + Duration::hours(24);
@@ -364,7 +376,10 @@ mod tests {
             image: None,
         };
 
-        let user = repo.create_user(&user_dto).await.expect("Failed to create user");
+        let user = repo
+            .create_user(&user_dto)
+            .await
+            .expect("Failed to create user");
 
         // Create a session
         let expires_at = Utc::now() + Duration::hours(24);
@@ -376,7 +391,10 @@ mod tests {
             user_agent: None,
         };
 
-        let created_session = repo.create_session(&session_dto).await.expect("Failed to create session");
+        let created_session = repo
+            .create_session(&session_dto)
+            .await
+            .expect("Failed to create session");
 
         // Test getting by token
         let result = repo.get_session_by_token("unique-session-token").await;
@@ -384,7 +402,7 @@ mod tests {
 
         let session = result.unwrap();
         assert!(session.is_some());
-        
+
         let session = session.unwrap();
         assert_eq!(session.id, created_session.id);
         assert_eq!(session.token, "unique-session-token");
@@ -412,7 +430,10 @@ mod tests {
             image: None,
         };
 
-        let user = repo.create_user(&user_dto).await.expect("Failed to create user");
+        let user = repo
+            .create_user(&user_dto)
+            .await
+            .expect("Failed to create user");
 
         // Create expired session
         let expired_session_dto = CreateSessionDto {
@@ -423,7 +444,9 @@ mod tests {
             user_agent: None,
         };
 
-        repo.create_session(&expired_session_dto).await.expect("Failed to create expired session");
+        repo.create_session(&expired_session_dto)
+            .await
+            .expect("Failed to create expired session");
 
         // Create valid session
         let valid_session_dto = CreateSessionDto {
@@ -434,7 +457,9 @@ mod tests {
             user_agent: None,
         };
 
-        repo.create_session(&valid_session_dto).await.expect("Failed to create valid session");
+        repo.create_session(&valid_session_dto)
+            .await
+            .expect("Failed to create valid session");
 
         // Delete expired sessions
         let result = repo.delete_expired_sessions().await;
@@ -469,7 +494,10 @@ mod tests {
             image: None,
         };
 
-        let user = repo.create_user(&user_dto).await.expect("Failed to create user");
+        let user = repo
+            .create_user(&user_dto)
+            .await
+            .expect("Failed to create user");
 
         // Create an account
         let account_dto = CreateAccountDto {
@@ -514,7 +542,10 @@ mod tests {
             image: None,
         };
 
-        let user = repo.create_user(&user_dto).await.expect("Failed to create user");
+        let user = repo
+            .create_user(&user_dto)
+            .await
+            .expect("Failed to create user");
 
         // Create an account
         let account_dto = CreateAccountDto {
@@ -530,7 +561,10 @@ mod tests {
             password: None,
         };
 
-        let created_account = repo.create_account(&account_dto).await.expect("Failed to create account");
+        let created_account = repo
+            .create_account(&account_dto)
+            .await
+            .expect("Failed to create account");
 
         // Test getting by provider
         let result = repo.get_account_by_provider(&user.id, "github").await;
@@ -538,7 +572,7 @@ mod tests {
 
         let account = result.unwrap();
         assert!(account.is_some());
-        
+
         let account = account.unwrap();
         assert_eq!(account.id, created_account.id);
         assert_eq!(account.provider_id, "github");
@@ -559,9 +593,15 @@ mod tests {
         let repo = UserRepository::new(pool.clone());
 
         let expires_at = Utc::now() + Duration::hours(1);
-        
+
         // Create verification
-        let result = repo.create_verification("email:test@example.com", "verification-code-123", expires_at).await;
+        let result = repo
+            .create_verification(
+                "email:test@example.com",
+                "verification-code-123",
+                expires_at,
+            )
+            .await;
         assert!(result.is_ok());
 
         let verification = result.unwrap();
@@ -570,17 +610,21 @@ mod tests {
         assert_eq!(verification.expires_at, expires_at);
 
         // Get verification
-        let result = repo.get_verification("email:test@example.com", "verification-code-123").await;
+        let result = repo
+            .get_verification("email:test@example.com", "verification-code-123")
+            .await;
         assert!(result.is_ok());
 
         let found_verification = result.unwrap();
         assert!(found_verification.is_some());
-        
+
         let found_verification = found_verification.unwrap();
         assert_eq!(found_verification.id, verification.id);
 
         // Test getting non-existent verification
-        let result = repo.get_verification("email:test@example.com", "wrong-code").await;
+        let result = repo
+            .get_verification("email:test@example.com", "wrong-code")
+            .await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
 
@@ -596,13 +640,19 @@ mod tests {
 
         // Create expired verification
         let expired_expires_at = Utc::now() - Duration::hours(1);
-        repo.create_verification("email:expired@example.com", "expired-code", expired_expires_at)
-            .await.expect("Failed to create expired verification");
+        repo.create_verification(
+            "email:expired@example.com",
+            "expired-code",
+            expired_expires_at,
+        )
+        .await
+        .expect("Failed to create expired verification");
 
         // Create valid verification
         let valid_expires_at = Utc::now() + Duration::hours(1);
         repo.create_verification("email:valid@example.com", "valid-code", valid_expires_at)
-            .await.expect("Failed to create valid verification");
+            .await
+            .expect("Failed to create valid verification");
 
         // Delete expired verifications
         let result = repo.delete_expired_verifications().await;
@@ -610,12 +660,16 @@ mod tests {
         assert_eq!(result.unwrap(), 1); // Should delete 1 expired verification
 
         // Verify expired verification is deleted
-        let result = repo.get_verification("email:expired@example.com", "expired-code").await;
+        let result = repo
+            .get_verification("email:expired@example.com", "expired-code")
+            .await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
 
         // Verify valid verification still exists
-        let result = repo.get_verification("email:valid@example.com", "valid-code").await;
+        let result = repo
+            .get_verification("email:valid@example.com", "valid-code")
+            .await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_some());
 

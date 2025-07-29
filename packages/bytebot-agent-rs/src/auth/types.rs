@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-
+use serde::{Deserialize, Serialize};
 
 /// User information extracted from session
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,10 +38,10 @@ pub struct AuthContext {
 pub struct JwtClaims {
     pub sub: String,        // User ID
     pub session_id: String, // Session ID
-    pub exp: i64,          // Expiration timestamp
-    pub iat: i64,          // Issued at timestamp
-    pub iss: String,       // Issuer
-    pub aud: String,       // Audience
+    pub exp: i64,           // Expiration timestamp
+    pub iat: i64,           // Issued at timestamp
+    pub iss: String,        // Issuer
+    pub aud: String,        // Audience
 }
 
 /// Authentication error types
@@ -50,25 +49,25 @@ pub struct JwtClaims {
 pub enum AuthError {
     #[error("Invalid token: {0}")]
     InvalidToken(String),
-    
+
     #[error("Token expired")]
     TokenExpired,
-    
+
     #[error("Session not found")]
     SessionNotFound,
-    
+
     #[error("User not found")]
     UserNotFound,
-    
+
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
-    
+
     #[error("JWT error: {0}")]
     Jwt(#[from] jsonwebtoken::errors::Error),
-    
+
     #[error("Missing authorization header")]
     MissingAuthHeader,
-    
+
     #[error("Invalid authorization header format")]
     InvalidAuthHeaderFormat,
 }

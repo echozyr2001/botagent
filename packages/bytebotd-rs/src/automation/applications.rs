@@ -1,5 +1,6 @@
-use crate::error::AutomationError;
 use tracing::{debug, warn};
+
+use crate::error::AutomationError;
 
 #[derive(Debug, Clone)]
 pub struct ApplicationService;
@@ -12,7 +13,7 @@ impl ApplicationService {
     /// Switch to a specific application
     pub async fn switch_to(&self, application: &str) -> Result<(), AutomationError> {
         debug!("Switching to application: {}", application);
-        
+
         match application.to_lowercase().as_str() {
             "firefox" => self.switch_to_firefox().await,
             "vscode" | "code" => self.switch_to_vscode().await,
@@ -21,9 +22,9 @@ impl ApplicationService {
             "directory" | "files" => self.switch_to_directory().await,
             _ => {
                 warn!("Unknown application: {}", application);
-                Err(AutomationError::UnsupportedOperation(
-                    format!("Application '{application}' is not supported")
-                ))
+                Err(AutomationError::UnsupportedOperation(format!(
+                    "Application '{application}' is not supported"
+                )))
             }
         }
     }
@@ -36,7 +37,7 @@ impl ApplicationService {
         // 3. Or launching Firefox if not running
         warn!("Firefox switching not yet implemented");
         Err(AutomationError::UnsupportedOperation(
-            "Firefox switching not yet implemented".to_string()
+            "Firefox switching not yet implemented".to_string(),
         ))
     }
 
@@ -44,7 +45,7 @@ impl ApplicationService {
         // TODO: Implement VS Code switching logic
         warn!("VS Code switching not yet implemented");
         Err(AutomationError::UnsupportedOperation(
-            "VS Code switching not yet implemented".to_string()
+            "VS Code switching not yet implemented".to_string(),
         ))
     }
 
@@ -52,7 +53,7 @@ impl ApplicationService {
         // TODO: Implement terminal switching logic
         warn!("Terminal switching not yet implemented");
         Err(AutomationError::UnsupportedOperation(
-            "Terminal switching not yet implemented".to_string()
+            "Terminal switching not yet implemented".to_string(),
         ))
     }
 
@@ -60,7 +61,7 @@ impl ApplicationService {
         // TODO: Implement desktop switching logic
         warn!("Desktop switching not yet implemented");
         Err(AutomationError::UnsupportedOperation(
-            "Desktop switching not yet implemented".to_string()
+            "Desktop switching not yet implemented".to_string(),
         ))
     }
 
@@ -68,7 +69,7 @@ impl ApplicationService {
         // TODO: Implement file manager switching logic
         warn!("Directory switching not yet implemented");
         Err(AutomationError::UnsupportedOperation(
-            "Directory switching not yet implemented".to_string()
+            "Directory switching not yet implemented".to_string(),
         ))
     }
 }
@@ -80,7 +81,10 @@ mod tests {
     #[tokio::test]
     async fn test_application_service_creation() {
         let result = ApplicationService::new();
-        assert!(result.is_ok(), "Application service should initialize successfully");
+        assert!(
+            result.is_ok(),
+            "Application service should initialize successfully"
+        );
     }
 
     #[tokio::test]

@@ -1,15 +1,18 @@
 #[cfg(test)]
 mod tests {
-    use crate::database::{
-        message_repository::{CreateMessageDto, MessageRepository, MessageRepositoryTrait, UpdateMessageDto},
-        task_repository::{TaskRepository, TaskRepositoryTrait},
-        tests::{cleanup_test_data, create_test_pool},
-        DatabaseError,
-    };
     use bytebot_shared_rs::types::{
         api::{CreateTaskDto, PaginationParams},
         message::MessageContentBlock,
-        task::{Role, TaskType, TaskPriority},
+        task::{Role, TaskPriority, TaskType},
+    };
+
+    use crate::database::{
+        message_repository::{
+            CreateMessageDto, MessageRepository, MessageRepositoryTrait, UpdateMessageDto,
+        },
+        task_repository::{TaskRepository, TaskRepositoryTrait},
+        tests::{cleanup_test_data, create_test_pool},
+        DatabaseError,
     };
 
     async fn create_test_task(pool: &sqlx::PgPool) -> String {
@@ -24,8 +27,11 @@ mod tests {
             model: None,
             files: None,
         };
-        
-        let task = task_repo.create(&dto).await.expect("Failed to create test task");
+
+        let task = task_repo
+            .create(&dto)
+            .await
+            .expect("Failed to create test task");
         task.id
     }
 
@@ -39,7 +45,11 @@ mod tests {
 
         let content = vec![
             MessageContentBlock::text("Hello, world!"),
-            MessageContentBlock::tool_use("test_tool", "tool-123", serde_json::json!({"param": "value"})),
+            MessageContentBlock::tool_use(
+                "test_tool",
+                "tool-123",
+                serde_json::json!({"param": "value"}),
+            ),
         ];
 
         let dto = CreateMessageDto {
@@ -57,11 +67,13 @@ mod tests {
         assert_eq!(message.role, Role::User);
         assert_eq!(message.task_id, task_id);
         assert_eq!(message.user_id, Some("test-user".to_string()));
-        
+
         // Verify content was serialized correctly
-        let content_blocks = message.get_content_blocks().expect("Failed to deserialize content");
+        let content_blocks = message
+            .get_content_blocks()
+            .expect("Failed to deserialize content");
         assert_eq!(content_blocks.len(), 2);
-        
+
         cleanup_test_data(&pool).await;
     }
 
@@ -83,7 +95,7 @@ mod tests {
 
         let result = repo.create(&dto).await;
         assert!(result.is_err());
-        
+
         if let Err(DatabaseError::ValidationError(msg)) = result {
             assert!(msg.contains("cannot be empty"));
         } else {
@@ -113,7 +125,7 @@ mod tests {
 
         let result = repo.create(&dto).await;
         assert!(result.is_err());
-        
+
         if let Err(DatabaseError::ValidationError(msg)) = result {
             assert!(msg.contains("cannot be empty"));
         } else {
@@ -149,7 +161,7 @@ mod tests {
 
         let message = result.unwrap();
         assert!(message.is_some());
-        
+
         let message = message.unwrap();
         assert_eq!(message.id, created_message.id);
         assert_eq!(message.role, Role::Assistant);
@@ -194,14 +206,19 @@ mod tests {
 
         let updated_message = result.unwrap();
         assert!(updated_message.is_some());
-        
+
         let updated_message = updated_message.unwrap();
         assert_eq!(updated_message.id, created_message.id);
-        assert_eq!(updated_message.summary_id, Some("test-summary-id".to_string()));
+        assert_eq!(
+            updated_message.summary_id,
+            Some("test-summary-id".to_string())
+        );
         assert!(updated_message.updated_at > created_message.updated_at);
 
         // Verify content was updated
-        let content_blocks = updated_message.get_content_blocks().expect("Failed to deserialize content");
+        let content_blocks = updated_message
+            .get_content_blocks()
+            .expect("Failed to deserialize content");
         assert_eq!(content_blocks.len(), 1);
         if let Some(text) = content_blocks[0].as_text() {
             assert_eq!(text, "Updated message");
@@ -248,7 +265,8 @@ mod tests {
         assert!(!result.unwrap());
 
         cleanup_test_data(&pool).await;
-    }    #[tokio::test]
+    }
+    #[tokio::test]
     async fn test_get_messages_by_task_id() {
         let pool = create_test_pool().await;
         cleanup_test_data(&pool).await;
@@ -261,7 +279,11 @@ mod tests {
             let content = vec![MessageContentBlock::text(&format!("Message {}", i))];
             let dto = CreateMessageDto {
                 content,
-                role: if i % 2 == 0 { Role::User } else { Role::Assistant },
+                role: if i % 2 == 0 {
+                    Role::User
+                } else {
+                    Role::Assistant
+                },
                 task_id: task_id.clone(),
                 user_id: None,
                 summary_id: None,
@@ -275,11 +297,13 @@ mod tests {
 
         let messages = result.unwrap();
         assert_eq!(messages.len(), 3);
-        
+
         // Messages should be ordered by creation time (ASC)
         for (i, message) in messages.iter().enumerate() {
             assert_eq!(message.task_id, task_id);
-            let content_blocks = message.get_content_blocks().expect("Failed to deserialize content");
+            let content_blocks = message
+                .get_content_blocks()
+                .expect("Failed to deserialize content");
             if let Some(text) = content_blocks[0].as_text() {
                 assert_eq!(text, format!("Message {}", i));
             }
@@ -360,7 +384,10 @@ mod tests {
         }
 
         // Verify messages exist
-        let messages = repo.get_by_task_id(&task_id).await.expect("Failed to get messages");
+        let messages = repo
+            .get_by_task_id(&task_id)
+            .await
+            .expect("Failed to get messages");
         assert_eq!(messages.len(), 3);
 
         // Delete all messages for the task
@@ -369,7 +396,10 @@ mod tests {
         assert_eq!(result.unwrap(), 3);
 
         // Verify messages are deleted
-        let messages = repo.get_by_task_id(&task_id).await.expect("Failed to get messages");
+        let messages = repo
+            .get_by_task_id(&task_id)
+            .await
+            .expect("Failed to get messages");
         assert_eq!(messages.len(), 0);
 
         cleanup_test_data(&pool).await;
@@ -384,7 +414,10 @@ mod tests {
         let repo = MessageRepository::new(pool.clone());
 
         // Initially no messages
-        let count = repo.count_by_task_id(&task_id).await.expect("Failed to count messages");
+        let count = repo
+            .count_by_task_id(&task_id)
+            .await
+            .expect("Failed to count messages");
         assert_eq!(count, 0);
 
         // Create some messages
@@ -401,7 +434,10 @@ mod tests {
         }
 
         // Count should be 4
-        let count = repo.count_by_task_id(&task_id).await.expect("Failed to count messages");
+        let count = repo
+            .count_by_task_id(&task_id)
+            .await
+            .expect("Failed to count messages");
         assert_eq!(count, 4);
 
         cleanup_test_data(&pool).await;
@@ -426,7 +462,7 @@ mod tests {
                 summary_id: None,
             };
             repo.create(&dto).await.expect("Failed to create message");
-            
+
             // Small delay to ensure different timestamps
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
@@ -437,10 +473,12 @@ mod tests {
 
         let messages = result.unwrap();
         assert_eq!(messages.len(), 3);
-        
+
         // Messages should be ordered by creation time DESC (latest first)
         for (i, message) in messages.iter().enumerate() {
-            let content_blocks = message.get_content_blocks().expect("Failed to deserialize content");
+            let content_blocks = message
+                .get_content_blocks()
+                .expect("Failed to deserialize content");
             if let Some(text) = content_blocks[0].as_text() {
                 // Latest messages should be 4, 3, 2 (in that order)
                 assert_eq!(text, format!("Message {}", 4 - i));
@@ -459,7 +497,11 @@ mod tests {
         let repo = MessageRepository::new(pool.clone());
 
         // Test tool use validation - empty name should fail
-        let content = vec![MessageContentBlock::tool_use("", "tool-123", serde_json::json!({}))];
+        let content = vec![MessageContentBlock::tool_use(
+            "",
+            "tool-123",
+            serde_json::json!({}),
+        )];
         let dto = CreateMessageDto {
             content,
             role: Role::User,

@@ -1,12 +1,7 @@
-use axum::{
-    extract::State,
-    http::Method,
-    response::Json,
-    routing::get,
-    Router,
-};
-use serde_json::{json, Value};
 use std::sync::Arc;
+
+use axum::{extract::State, http::Method, response::Json, routing::get, Router};
+use serde_json::{json, Value};
 use tower::ServiceBuilder;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -15,11 +10,11 @@ use tower_http::{
 use tracing::Level;
 
 use crate::{
-    ai::UnifiedAIService, 
-    auth::{AuthService, AuthServiceTrait, auth_middleware, optional_auth_middleware},
-    config::Config, 
-    database::DatabaseManager, 
-    error::ServiceError, 
+    ai::UnifiedAIService,
+    auth::{auth_middleware, optional_auth_middleware, AuthService, AuthServiceTrait},
+    config::Config,
+    database::DatabaseManager,
+    error::ServiceError,
     routes::{create_auth_routes, create_message_routes, create_task_routes},
     websocket::WebSocketGateway,
 };
@@ -40,7 +35,7 @@ pub async fn create_app_state(config: Arc<Config>) -> Result<AppState, ServiceEr
     let db = Arc::new(
         DatabaseManager::new(&config.database_url)
             .await
-            .map_err(|e| ServiceError::Internal(format!("Database initialization failed: {e}")))?
+            .map_err(|e| ServiceError::Internal(format!("Database initialization failed: {e}")))?,
     );
 
     // Initialize AI service
@@ -87,9 +82,7 @@ pub fn create_app(state: AppState) -> Router {
         .on_response(DefaultOnResponse::new().level(Level::INFO));
 
     // Build middleware stack
-    let middleware = ServiceBuilder::new()
-        .layer(trace_layer)
-        .layer(cors);
+    let middleware = ServiceBuilder::new().layer(trace_layer).layer(cors);
 
     // Create router with health check endpoint and all routes
     Router::new()
@@ -97,16 +90,29 @@ pub fn create_app(state: AppState) -> Router {
         .route("/api/health", get(health_check)) // Match global prefix pattern
         .route("/ws-stats", get(websocket_stats)) // WebSocket statistics endpoint
         // Authentication routes (public)
-        .nest("/auth", create_auth_routes(
-            Arc::new(state.db.user_repository()),
-            state.auth_service.clone(),
-            state.config.jwt_secret.clone()
-        ))
+        .nest(
+            "/auth",
+            create_auth_routes(
+                Arc::new(state.db.user_repository()),
+                state.auth_service.clone(),
+                state.config.jwt_secret.clone(),
+            ),
+        )
         // Protected routes that require authentication (when enabled)
-        .nest("/tasks", create_task_routes()
-            .layer(axum::middleware::from_fn_with_state(state.auth_service.clone(), auth_middleware)))
-        .nest("/messages", create_message_routes()
-            .layer(axum::middleware::from_fn_with_state(state.auth_service.clone(), optional_auth_middleware)))
+        .nest(
+            "/tasks",
+            create_task_routes().layer(axum::middleware::from_fn_with_state(
+                state.auth_service.clone(),
+                auth_middleware,
+            )),
+        )
+        .nest(
+            "/messages",
+            create_message_routes().layer(axum::middleware::from_fn_with_state(
+                state.auth_service.clone(),
+                optional_auth_middleware,
+            )),
+        )
         // Integrate Socket.IO WebSocket server - socketioxide provides its own layer
         .layer(state.websocket_gateway.layer())
         .with_state(state)
@@ -117,7 +123,7 @@ pub fn create_app(state: AppState) -> Router {
 async fn health_check(State(state): State<AppState>) -> Result<Json<Value>, ServiceError> {
     // Check database connectivity
     let db_healthy = state.db.is_ready().await;
-    
+
     let status = if db_healthy { "healthy" } else { "unhealthy" };
 
     let response = json!({
@@ -140,7 +146,9 @@ async fn health_check(State(state): State<AppState>) -> Result<Json<Value>, Serv
     });
 
     if !db_healthy {
-        return Err(ServiceError::Internal("Database health check failed".to_string()));
+        return Err(ServiceError::Internal(
+            "Database health check failed".to_string(),
+        ));
     }
 
     Ok(Json(response))
@@ -149,7 +157,7 @@ async fn health_check(State(state): State<AppState>) -> Result<Json<Value>, Serv
 /// WebSocket statistics endpoint handler
 async fn websocket_stats(State(state): State<AppState>) -> Result<Json<Value>, ServiceError> {
     let stats = state.websocket_gateway.get_connection_stats().await;
-    
+
     let response = json!({
         "websocket": {
             "total_connections": stats.total_connections,
@@ -164,12 +172,13 @@ async fn websocket_stats(State(state): State<AppState>) -> Result<Json<Value>, S
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use axum::{
         body::Body,
         http::{Request, StatusCode},
     };
     use tower::ServiceExt;
+
+    use super::*;
 
     async fn create_test_app() -> Router {
         let config = Arc::new(Config::default());
@@ -193,14 +202,20 @@ mod tests {
             config.auth_enabled,
         ));
         let websocket_gateway = Arc::new(WebSocketGateway::new());
-        let state = AppState { config, db, ai_service, auth_service, websocket_gateway };
+        let state = AppState {
+            config,
+            db,
+            ai_service,
+            auth_service,
+            websocket_gateway,
+        };
         create_app(state)
     }
 
     #[tokio::test]
     async fn test_health_endpoint_exists() {
         let app = create_test_app().await;
-        
+
         let response = app
             .oneshot(
                 Request::builder()
@@ -218,7 +233,7 @@ mod tests {
     #[tokio::test]
     async fn test_cors_headers() {
         let app = create_test_app().await;
-        
+
         let response = app
             .oneshot(
                 Request::builder()
@@ -233,6 +248,8 @@ mod tests {
             .unwrap();
 
         // Should have CORS headers
-        assert!(response.headers().contains_key("access-control-allow-origin"));
+        assert!(response
+            .headers()
+            .contains_key("access-control-allow-origin"));
     }
 }

@@ -1,6 +1,6 @@
-use axum::{response::Json, http::StatusCode};
-use serde_json::{json, Value};
+use axum::{http::StatusCode, response::Json};
 use chrono::Utc;
+use serde_json::{json, Value};
 
 /// Health check endpoint
 pub async fn health_check() -> Result<Json<Value>, StatusCode> {
@@ -28,10 +28,10 @@ mod tests {
     async fn test_health_check() {
         let result = health_check().await;
         assert!(result.is_ok(), "Health check should succeed");
-        
+
         let response = result.unwrap();
         let json_value = response.0;
-        
+
         assert_eq!(json_value["status"], "healthy");
         assert_eq!(json_value["service"], "bytebotd-rs");
         assert!(json_value["capabilities"].is_array());

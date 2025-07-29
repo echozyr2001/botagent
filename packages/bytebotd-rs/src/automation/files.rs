@@ -1,8 +1,10 @@
-use crate::error::AutomationError;
-use base64::{engine::general_purpose, Engine as _};
 use std::path::{Path, PathBuf};
+
+use base64::{engine::general_purpose, Engine as _};
 use tokio::fs;
 use tracing::{debug, error, warn};
+
+use crate::error::AutomationError;
 
 #[derive(Debug, Clone)]
 pub struct FileService {
@@ -27,19 +29,21 @@ impl FileService {
         debug!("Reading file: {}", path);
 
         let path = self.validate_and_normalize_path(path)?;
-        
+
         // Check if file exists
         if !path.exists() {
-            return Err(AutomationError::FileFailed(
-                format!("File does not exist: {}", path.display())
-            ));
+            return Err(AutomationError::FileFailed(format!(
+                "File does not exist: {}",
+                path.display()
+            )));
         }
 
         // Check if it's a file (not a directory)
         if !path.is_file() {
-            return Err(AutomationError::FileFailed(
-                format!("Path is not a file: {}", path.display())
-            ));
+            return Err(AutomationError::FileFailed(format!(
+                "Path is not a file: {}",
+                path.display()
+            )));
         }
 
         // Check file size
@@ -91,7 +95,11 @@ impl FileService {
         // Create parent directories if they don't exist
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await.map_err(|e| {
-                error!("Failed to create parent directories for {}: {}", path.display(), e);
+                error!(
+                    "Failed to create parent directories for {}: {}",
+                    path.display(),
+                    e
+                );
                 AutomationError::FileFailed(format!("Failed to create directories: {e}"))
             })?;
         }
@@ -123,7 +131,11 @@ impl FileService {
         // Create parent directories if they don't exist
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await.map_err(|e| {
-                error!("Failed to create parent directories for {}: {}", path.display(), e);
+                error!(
+                    "Failed to create parent directories for {}: {}",
+                    path.display(),
+                    e
+                );
                 AutomationError::FileFailed(format!("Failed to create directories: {e}"))
             })?;
         }
@@ -142,19 +154,21 @@ impl FileService {
         debug!("Reading text file: {}", path);
 
         let path = self.validate_and_normalize_path(path)?;
-        
+
         // Check if file exists
         if !path.exists() {
-            return Err(AutomationError::FileFailed(
-                format!("File does not exist: {}", path.display())
-            ));
+            return Err(AutomationError::FileFailed(format!(
+                "File does not exist: {}",
+                path.display()
+            )));
         }
 
         // Check if it's a file (not a directory)
         if !path.is_file() {
-            return Err(AutomationError::FileFailed(
-                format!("Path is not a file: {}", path.display())
-            ));
+            return Err(AutomationError::FileFailed(format!(
+                "Path is not a file: {}",
+                path.display()
+            )));
         }
 
         // Check file size
@@ -189,11 +203,12 @@ impl FileService {
     /// Get file information
     pub async fn get_file_info(&self, path: &str) -> Result<FileInfo, AutomationError> {
         let path = self.validate_and_normalize_path(path)?;
-        
+
         if !path.exists() {
-            return Err(AutomationError::FileFailed(
-                format!("File does not exist: {}", path.display())
-            ));
+            return Err(AutomationError::FileFailed(format!(
+                "File does not exist: {}",
+                path.display()
+            )));
         }
 
         let metadata = fs::metadata(&path).await.map_err(|e| {
@@ -219,7 +234,7 @@ impl FileService {
         if path.contains("..") {
             warn!("Path traversal attempt detected: {}", path);
             return Err(AutomationError::InvalidPath(
-                "Path traversal not allowed".to_string()
+                "Path traversal not allowed".to_string(),
             ));
         }
 
@@ -229,7 +244,9 @@ impl FileService {
             path.to_path_buf()
         } else {
             std::env::current_dir()
-                .map_err(|e| AutomationError::FileFailed(format!("Failed to get current directory: {e}")))?
+                .map_err(|e| {
+                    AutomationError::FileFailed(format!("Failed to get current directory: {e}"))
+                })?
                 .join(path)
         };
 
@@ -251,27 +268,31 @@ pub struct FileInfo {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::NamedTempFile;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_file_service_creation() {
         let result = FileService::new();
-        assert!(result.is_ok(), "File service should initialize successfully");
+        assert!(
+            result.is_ok(),
+            "File service should initialize successfully"
+        );
     }
 
     #[tokio::test]
     async fn test_validate_path() {
         let service = FileService::new().expect("Failed to create file service");
-        
+
         // Valid path
         let result = service.validate_and_normalize_path("test.txt");
         assert!(result.is_ok(), "Valid path should be accepted");
-        
+
         // Path traversal attempt
         let result = service.validate_and_normalize_path("../test.txt");
         assert!(result.is_err(), "Path traversal should be rejected");
-        
+
         // Empty path
         let result = service.validate_and_normalize_path("");
         assert!(result.is_err(), "Empty path should be rejected");
@@ -280,30 +301,37 @@ mod tests {
     #[tokio::test]
     async fn test_file_operations() {
         let service = FileService::new().expect("Failed to create file service");
-        
+
         // Create a temporary file
         let temp_file = NamedTempFile::new().expect("Failed to create temp file");
         let temp_path = temp_file.path().to_str().unwrap();
-        
+
         // Write some text
         let test_text = "Hello, World!";
         let result = service.write_text_file(temp_path, test_text).await;
         assert!(result.is_ok(), "Writing text file should succeed");
-        
+
         // Read the text back
         let result = service.read_text_file(temp_path).await;
         assert!(result.is_ok(), "Reading text file should succeed");
-        assert_eq!(result.unwrap(), test_text, "Read text should match written text");
-        
+        assert_eq!(
+            result.unwrap(),
+            test_text,
+            "Read text should match written text"
+        );
+
         // Check if file exists
         let exists = service.file_exists(temp_path).await.unwrap();
         assert!(exists, "File should exist");
-        
+
         // Get file info
         let info = service.get_file_info(temp_path).await;
         assert!(info.is_ok(), "Getting file info should succeed");
         let info = info.unwrap();
         assert!(info.is_file, "Should be identified as a file");
-        assert!(!info.is_directory, "Should not be identified as a directory");
+        assert!(
+            !info.is_directory,
+            "Should not be identified as a directory"
+        );
     }
 }

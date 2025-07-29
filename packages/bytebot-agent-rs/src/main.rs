@@ -7,11 +7,12 @@ mod routes;
 mod server;
 mod websocket;
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use config::Config;
 use database::MigrationRunner;
 use server::{create_app, create_app_state};
-use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{error, info, Level};
 
@@ -22,7 +23,7 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|_| "info".to_string())
         .parse::<Level>()
         .unwrap_or(Level::INFO);
-    
+
     tracing_subscriber::fmt()
         .with_max_level(log_level)
         .with_target(false)
@@ -37,7 +38,10 @@ async fn main() -> Result<()> {
     })?;
 
     info!("Configuration loaded successfully");
-    info!("Server will bind to {}:{}", config.server.host, config.server.port);
+    info!(
+        "Server will bind to {}:{}",
+        config.server.host, config.server.port
+    );
 
     // Create database if it doesn't exist
     MigrationRunner::create_database_if_not_exists(&config.database_url).await?;
@@ -48,7 +52,10 @@ async fn main() -> Result<()> {
         .connect(&config.database_url)
         .await
         .map_err(|e| {
-            error!("Failed to create temporary database connection for migrations: {}", e);
+            error!(
+                "Failed to create temporary database connection for migrations: {}",
+                e
+            );
             e
         })?;
 
@@ -69,7 +76,7 @@ async fn main() -> Result<()> {
     })?;
 
     info!("Application state initialized successfully");
-    
+
     // Log authentication status
     if app_state.config.auth_enabled {
         info!("Authentication is ENABLED");
@@ -79,7 +86,10 @@ async fn main() -> Result<()> {
 
     // Log pool statistics
     let stats = app_state.db.pool_stats();
-    info!("Database pool stats - Size: {}, Idle: {}", stats.size, stats.idle);
+    info!(
+        "Database pool stats - Size: {}, Idle: {}",
+        stats.size, stats.idle
+    );
 
     // Create Axum application with middleware
     let app = create_app(app_state);
@@ -91,10 +101,19 @@ async fn main() -> Result<()> {
         anyhow::anyhow!("Failed to bind to address: {}", e)
     })?;
 
-    info!("ByteBot Agent Rust service started successfully on {}", bind_address);
+    info!(
+        "ByteBot Agent Rust service started successfully on {}",
+        bind_address
+    );
     info!("Health check available at: http://{}/health", bind_address);
-    info!("WebSocket endpoint available at: ws://{}/socket.io/", bind_address);
-    info!("WebSocket stats available at: http://{}/ws-stats", bind_address);
+    info!(
+        "WebSocket endpoint available at: ws://{}/socket.io/",
+        bind_address
+    );
+    info!(
+        "WebSocket stats available at: http://{}/ws-stats",
+        bind_address
+    );
 
     // Start the server
     axum::serve(listener, app)

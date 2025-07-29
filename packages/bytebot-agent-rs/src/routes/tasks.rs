@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -5,15 +7,13 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use serde_json::{json, Value};
-use std::collections::HashMap;
-use tracing::{debug, info};
-use validator::Validate;
-
 use bytebot_shared_rs::types::{
     api::{ApiResponse, CreateTaskDto, PaginatedResponse, PaginationParams, UpdateTaskDto},
     task::{Task, TaskStatus},
 };
+use serde_json::{json, Value};
+use tracing::{debug, info};
+use validator::Validate;
 
 use crate::{
     database::task_repository::{TaskFilter, TaskRepositoryTrait},
@@ -396,15 +396,16 @@ async fn cancel_task(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::sync::Arc;
+
     use axum::{
         body::Body,
         http::{Method, Request, StatusCode},
     };
     use serde_json::json;
-    use std::sync::Arc;
     use tower::ServiceExt;
 
+    use super::*;
     use crate::{
         ai::UnifiedAIService,
         auth::{AuthService, AuthServiceTrait},

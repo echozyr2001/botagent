@@ -1,4 +1,7 @@
-use bytebot_agent_rs::{ai::anthropic::AnthropicService, ai::AIService, config::Config};
+use bytebot_agent_rs::{
+    ai::{anthropic::AnthropicService, AIService},
+    config::Config,
+};
 use bytebot_shared_rs::types::{message::MessageContentBlock, task::Role};
 
 /// Example demonstrating how to use the Anthropic service

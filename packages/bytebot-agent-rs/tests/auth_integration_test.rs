@@ -1,15 +1,14 @@
 use axum::{
     body::Body,
-    http::{Request, StatusCode, header},
+    http::{header, Request, StatusCode},
+};
+use bytebot_agent_rs::{
+    auth::{AuthService, AuthServiceTrait},
+    database::{user_repository::UserRepository, DatabaseManager},
+    routes::create_auth_routes,
 };
 use serde_json::json;
 use tower::ServiceExt;
-
-use bytebot_agent_rs::{
-    auth::{AuthService, AuthServiceTrait},
-    database::{DatabaseManager, user_repository::UserRepository},
-    routes::create_auth_routes,
-};
 
 /// Integration test for authentication endpoints
 #[tokio::test]
@@ -41,11 +40,7 @@ async fn test_auth_endpoints_integration() {
     ));
 
     // Create auth routes
-    let app = create_auth_routes(
-        user_repository,
-        auth_service,
-        "test-jwt-secret".to_string(),
-    );
+    let app = create_auth_routes(user_repository, auth_service, "test-jwt-secret".to_string());
 
     // Test user registration
     let register_request = json!({
@@ -94,17 +89,22 @@ async fn test_auth_endpoints_integration() {
 
     // Login should succeed if user exists
     if response.status() == StatusCode::OK {
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        
+
         // Verify response structure
         assert!(response_json["user"]["id"].is_string());
         assert_eq!(response_json["user"]["email"], "test@example.com");
         assert!(response_json["token"].is_string());
-        
+
         println!("Auth integration test passed - login successful");
     } else {
-        println!("Auth integration test - login failed with status: {}", response.status());
+        println!(
+            "Auth integration test - login failed with status: {}",
+            response.status()
+        );
     }
 }
 
@@ -112,35 +112,41 @@ async fn test_auth_endpoints_integration() {
 #[test]
 fn test_password_hashing() {
     use argon2::{
-        password_hash::{rand_core::OsRng, PasswordHasher, PasswordVerifier, PasswordHash, SaltString},
+        password_hash::{
+            rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
+        },
         Argon2,
     };
 
     let password = "testpassword123";
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
-    
+
     // Hash password
     let password_hash = argon2.hash_password(password.as_bytes(), &salt).unwrap();
     let hash_string = password_hash.to_string();
-    
+
     // Verify password can be validated
     let parsed_hash = PasswordHash::new(&hash_string).unwrap();
-    assert!(argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok());
-    assert!(argon2.verify_password("wrongpassword".as_bytes(), &parsed_hash).is_err());
-    
+    assert!(argon2
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .is_ok());
+    assert!(argon2
+        .verify_password("wrongpassword".as_bytes(), &parsed_hash)
+        .is_err());
+
     // Verify hash format
     assert!(hash_string.starts_with("$argon2"));
-    
+
     println!("Password hashing test passed");
 }
 
 /// Test JWT token generation
 #[test]
 fn test_jwt_token_generation() {
-    use jsonwebtoken::{encode, EncodingKey, Header, Algorithm};
-    use serde::{Deserialize, Serialize};
     use chrono::{Duration, Utc};
+    use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Serialize, Deserialize)]
     struct Claims {
@@ -154,7 +160,7 @@ fn test_jwt_token_generation() {
 
     let user_id = "test-user-id";
     let session_id = "test-session-id";
-    
+
     let claims = Claims {
         sub: user_id.to_string(),
         session_id: session_id.to_string(),
@@ -168,12 +174,13 @@ fn test_jwt_token_generation() {
         &Header::new(Algorithm::HS256),
         &claims,
         &EncodingKey::from_secret("test-secret".as_ref()),
-    ).unwrap();
-    
+    )
+    .unwrap();
+
     // Verify token structure
     assert!(!token.is_empty());
     let parts: Vec<&str> = token.split('.').collect();
     assert_eq!(parts.len(), 3); // JWT has 3 parts: header.payload.signature
-    
+
     println!("JWT token generation test passed");
 }

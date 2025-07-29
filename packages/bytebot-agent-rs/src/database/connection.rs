@@ -1,8 +1,12 @@
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres, Row};
 use std::time::Duration;
+
+use sqlx::{postgres::PgPoolOptions, Pool, Postgres, Row};
 use tracing::{error, info, warn};
 
-use super::{MessageRepository, MessageRepositoryTrait, TaskRepository, TaskRepositoryTrait, UserRepository, UserRepositoryTrait};
+use super::{
+    MessageRepository, MessageRepositoryTrait, TaskRepository, TaskRepositoryTrait, UserRepository,
+    UserRepositoryTrait,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DatabaseError {
@@ -47,7 +51,7 @@ impl DatabaseManager {
     /// Create a new database connection pool with retry logic
     pub async fn new(database_url: &str) -> Result<Self, DatabaseError> {
         info!("Initializing database connection pool...");
-        
+
         let pool = PgPoolOptions::new()
             .max_connections(20)
             .min_connections(5)
@@ -59,12 +63,12 @@ impl DatabaseManager {
             .await?;
 
         info!("Database connection pool initialized successfully");
-        
+
         let manager = Self { pool };
-        
+
         // Perform initial health check
         manager.health_check().await?;
-        
+
         Ok(manager)
     }
 
@@ -165,11 +169,14 @@ impl PgPoolOptionsExt for PgPoolOptions {
 
         while attempts < max_retries {
             attempts += 1;
-            
+
             match self.clone().connect(database_url).await {
                 Ok(pool) => {
                     if attempts > 1 {
-                        info!("Database connection established after {} attempts", attempts);
+                        info!(
+                            "Database connection established after {} attempts",
+                            attempts
+                        );
                     }
                     return Ok(pool);
                 }
@@ -187,7 +194,10 @@ impl PgPoolOptionsExt for PgPoolOptions {
             }
         }
 
-        error!("Failed to connect to database after {} attempts", max_retries);
+        error!(
+            "Failed to connect to database after {} attempts",
+            max_retries
+        );
         Err(last_error.unwrap())
     }
 }
@@ -206,7 +216,7 @@ mod tests {
 
         let database_url = std::env::var("DATABASE_URL").unwrap();
         let manager = DatabaseManager::new(&database_url).await;
-        
+
         match manager {
             Ok(manager) => {
                 assert!(manager.is_ready().await);

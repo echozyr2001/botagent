@@ -1,18 +1,15 @@
+use std::sync::Arc;
+
 use axum::{
     body::Body,
     http::{Method, Request, StatusCode},
 };
-use serde_json::Value;
-use std::sync::Arc;
-use tower::ServiceExt;
-
 use bytebot_agent_rs::{
-    ai::UnifiedAIService,
-    config::Config,
-    database::DatabaseManager,
-    routes::create_task_routes,
+    ai::UnifiedAIService, config::Config, database::DatabaseManager, routes::create_task_routes,
     server::AppState,
 };
+use serde_json::Value;
+use tower::ServiceExt;
 
 /// Integration test for the models endpoint
 #[tokio::test]
@@ -81,11 +78,11 @@ async fn test_models_endpoint_integration() {
         assert!(model["provider"].is_string());
         assert!(model["name"].is_string());
         assert!(model["title"].is_string());
-        
+
         let provider = model["provider"].as_str().unwrap();
         let name = model["name"].as_str().unwrap();
         let title = model["title"].as_str().unwrap();
-        
+
         // Verify provider-specific model names
         match provider {
             "anthropic" => {

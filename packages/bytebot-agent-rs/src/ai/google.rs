@@ -1,16 +1,16 @@
-use async_trait::async_trait;
-use reqwest::{Client, StatusCode};
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::{error, warn};
 
-use crate::{config::Config, error::AIError};
+use async_trait::async_trait;
 use bytebot_shared_rs::types::{
     message::{DocumentSource, Message, MessageContentBlock},
     task::Role,
 };
+use reqwest::{Client, StatusCode};
+use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
 
 use super::{AIService, ModelInfo};
+use crate::{config::Config, error::AIError};
 
 /// Google Gemini API constants
 const GOOGLE_API_BASE: &str = "https://generativelanguage.googleapis.com/v1beta";
@@ -432,8 +432,9 @@ impl AIService for GoogleService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytebot_shared_rs::types::message::Message;
+
+    use super::*;
 
     fn create_test_config() -> Config {
         Config {

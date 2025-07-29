@@ -1,7 +1,8 @@
 use std::sync::Arc;
+
 use axum::async_trait;
 use chrono::Utc;
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use sqlx::{PgPool, Row};
 use tracing::{debug, warn};
 
@@ -28,12 +29,14 @@ impl AuthService {
     pub async fn validate_token(&self, token: &str) -> Result<AuthContext, AuthError> {
         if !self.auth_enabled {
             debug!("Authentication disabled, skipping token validation");
-            return Err(AuthError::InvalidToken("Authentication disabled".to_string()));
+            return Err(AuthError::InvalidToken(
+                "Authentication disabled".to_string(),
+            ));
         }
 
         // Decode and validate JWT token
         let claims = self.decode_jwt(token)?;
-        
+
         // Check if token is expired
         let now = Utc::now().timestamp();
         if claims.exp < now {
@@ -43,7 +46,7 @@ impl AuthService {
 
         // Fetch session from database
         let session = self.get_session(&claims.session_id).await?;
-        
+
         // Check if session is expired
         if session.expires_at < Utc::now() {
             warn!("Session expired: session_id={}", session.id);
@@ -61,12 +64,12 @@ impl AuthService {
         if !auth_header.starts_with("Bearer ") {
             return Err(AuthError::InvalidAuthHeaderFormat);
         }
-        
+
         let token = auth_header.strip_prefix("Bearer ").unwrap();
         if token.is_empty() {
             return Err(AuthError::InvalidAuthHeaderFormat);
         }
-        
+
         Ok(token.to_string())
     }
 
@@ -75,7 +78,7 @@ impl AuthService {
         let key = DecodingKey::from_secret(self.jwt_secret.as_ref());
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = false; // We'll validate expiration manually
-        
+
         let token_data = decode::<JwtClaims>(token, &key, &validation)?;
         Ok(token_data.claims)
     }
@@ -186,9 +189,9 @@ impl AuthServiceTrait for AuthService {
 
 #[cfg(test)]
 mod tests {
+    use mockall::{mock, predicate::*};
+
     use super::*;
-    use mockall::predicate::*;
-    use mockall::mock;
 
     mock! {
         AuthService {}
@@ -204,12 +207,9 @@ mod tests {
     #[tokio::test]
     async fn test_extract_token_from_header_success() {
         // Create a mock pool for testing
-        let pool = Arc::new(sqlx::PgPool::connect_lazy("postgresql://localhost:5432/test").unwrap());
-        let service = AuthService::new(
-            pool,
-            "secret".to_string(),
-            true,
-        );
+        let pool =
+            Arc::new(sqlx::PgPool::connect_lazy("postgresql://localhost:5432/test").unwrap());
+        let service = AuthService::new(pool, "secret".to_string(), true);
 
         let result = service.extract_token_from_header("Bearer abc123");
         assert!(result.is_ok());
@@ -218,12 +218,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_extract_token_from_header_invalid_format() {
-        let pool = Arc::new(sqlx::PgPool::connect_lazy("postgresql://localhost:5432/test").unwrap());
-        let service = AuthService::new(
-            pool,
-            "secret".to_string(),
-            true,
-        );
+        let pool =
+            Arc::new(sqlx::PgPool::connect_lazy("postgresql://localhost:5432/test").unwrap());
+        let service = AuthService::new(pool, "secret".to_string(), true);
 
         let result = service.extract_token_from_header("Invalid abc123");
         assert!(matches!(result, Err(AuthError::InvalidAuthHeaderFormat)));
@@ -231,12 +228,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_extract_token_from_header_empty_token() {
-        let pool = Arc::new(sqlx::PgPool::connect_lazy("postgresql://localhost:5432/test").unwrap());
-        let service = AuthService::new(
-            pool,
-            "secret".to_string(),
-            true,
-        );
+        let pool =
+            Arc::new(sqlx::PgPool::connect_lazy("postgresql://localhost:5432/test").unwrap());
+        let service = AuthService::new(pool, "secret".to_string(), true);
 
         let result = service.extract_token_from_header("Bearer ");
         assert!(matches!(result, Err(AuthError::InvalidAuthHeaderFormat)));

@@ -1,5 +1,5 @@
+use bytebot_shared_rs::types::{Message, Task};
 use serde::{Deserialize, Serialize};
-use bytebot_shared_rs::types::{Task, Message};
 
 /// WebSocket event types that match the TypeScript implementation
 #[derive(Debug, Clone, Serialize, Deserialize)]

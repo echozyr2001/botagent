@@ -1,5 +1,6 @@
-use sqlx::{migrate::MigrateDatabase, Postgres};
 use std::path::Path;
+
+use sqlx::{migrate::MigrateDatabase, Postgres};
 use tracing::{error, info, warn};
 
 use super::{DatabaseError, DatabasePool};
@@ -243,7 +244,7 @@ ALTER TABLE "File" ADD CONSTRAINT "File_taskId_fkey" FOREIGN KEY ("taskId") REFE
             SELECT version, description, installed_on, success
             FROM _sqlx_migrations
             ORDER BY version
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await
@@ -265,7 +266,7 @@ ALTER TABLE "File" ADD CONSTRAINT "File_taskId_fkey" FOREIGN KEY ("taskId") REFE
     /// Rollback the last migration (if supported)
     pub async fn rollback_last_migration(&self) -> Result<(), DatabaseError> {
         warn!("Migration rollback requested - this is a destructive operation");
-        
+
         // Note: SQLx doesn't support automatic rollbacks
         // This would need to be implemented manually with down migrations
         Err(DatabaseError::Migration(
@@ -303,14 +304,14 @@ mod tests {
         }
 
         let database_url = std::env::var("DATABASE_URL").unwrap();
-        
+
         match DatabaseManager::new(&database_url).await {
             Ok(manager) => {
                 let runner = MigrationRunner::new(manager.pool().clone());
-                
+
                 // Test that we can create a migration runner
                 assert!(std::mem::size_of_val(&runner) > 0);
-                
+
                 manager.close().await;
             }
             Err(e) => {
@@ -325,7 +326,7 @@ mod tests {
         let pool = sqlx::Pool::<Postgres>::connect_lazy("postgresql://test").unwrap();
         let runner = MigrationRunner::new(pool);
         let schema = runner.generate_initial_schema_sql();
-        
+
         // Verify that the schema contains expected tables
         assert!(schema.contains("CREATE TABLE \"Task\""));
         assert!(schema.contains("CREATE TABLE \"Message\""));

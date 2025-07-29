@@ -1,7 +1,7 @@
-pub mod gateway;
-pub mod events;
 pub mod connection;
+pub mod events;
+pub mod gateway;
 
-pub use gateway::*;
-pub use events::*;
 pub use connection::*;
+pub use events::*;
+pub use gateway::*;

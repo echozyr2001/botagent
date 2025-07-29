@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{FromRequestParts, State},
     http::request::Parts,
@@ -7,14 +9,15 @@ use axum::{
 };
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 use validator::Validate;
 
-use crate::auth::{AuthContext, AuthServiceTrait};
-use crate::database::user_repository::UserRepositoryTrait;
-use crate::error::ServiceError;
+use crate::{
+    auth::{AuthContext, AuthServiceTrait},
+    database::user_repository::UserRepositoryTrait,
+    error::ServiceError,
+};
 
 /// Request body for user registration
 #[derive(Debug, Deserialize, Validate)]

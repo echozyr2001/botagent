@@ -9,22 +9,22 @@ use serde_json::json;
 pub enum ServiceError {
     #[error("Database error: {0}")]
     Database(#[from] crate::database::DatabaseError),
-    
+
     #[error("Configuration error: {0}")]
     Config(#[from] crate::config::ConfigError),
-    
+
     #[error("AI service error: {0}")]
     AI(#[from] AIError),
-    
+
     #[error("Validation error: {0}")]
     Validation(String),
-    
+
     #[error("Not found: {0}")]
     NotFound(String),
-    
+
     #[error("Unauthorized")]
     Unauthorized,
-    
+
     #[error("Internal server error: {0}")]
     Internal(String),
 }
@@ -33,16 +33,16 @@ pub enum ServiceError {
 pub enum AIError {
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
-    
+
     #[error("API error: {status} - {message}")]
     Api { status: u16, message: String },
-    
+
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
-    
+
     #[error("Rate limit exceeded")]
     RateLimit,
-    
+
     #[error("Invalid model: {0}")]
     InvalidModel(String),
 }
@@ -51,13 +51,13 @@ pub enum AIError {
 pub enum AutomationError {
     #[error("Computer action failed: {0}")]
     ActionFailed(String),
-    
+
     #[error("Invalid coordinates: {0}")]
     InvalidCoordinates(String),
-    
+
     #[error("File operation failed: {0}")]
     FileOperation(String),
-    
+
     #[error("Screen capture failed: {0}")]
     ScreenCapture(String),
 }
@@ -71,23 +71,38 @@ impl IntoResponse for ServiceError {
             ServiceError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized".to_string()),
             ServiceError::Database(e) => {
                 tracing::error!("Database error: {}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
             ServiceError::Config(e) => {
                 tracing::error!("Configuration error: {}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Configuration error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Configuration error".to_string(),
+                )
             }
             ServiceError::AI(e) => {
                 tracing::error!("AI service error: {}", e);
                 match e {
-                    AIError::RateLimit => (StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded".to_string()),
+                    AIError::RateLimit => (
+                        StatusCode::TOO_MANY_REQUESTS,
+                        "Rate limit exceeded".to_string(),
+                    ),
                     AIError::InvalidModel(msg) => (StatusCode::BAD_REQUEST, msg),
-                    _ => (StatusCode::INTERNAL_SERVER_ERROR, "AI service error".to_string()),
+                    _ => (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "AI service error".to_string(),
+                    ),
                 }
             }
             ServiceError::Internal(msg) => {
                 tracing::error!("Internal error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
         };
 
@@ -104,8 +119,9 @@ pub type ServiceResult<T> = Result<T, ServiceError>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use axum::http::StatusCode;
+
+    use super::*;
 
     #[test]
     fn test_service_error_response_conversion() {

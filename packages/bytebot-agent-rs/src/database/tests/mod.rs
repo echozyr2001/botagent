@@ -1,5 +1,6 @@
-use sqlx::{Pool, Postgres, PgPool};
 use std::sync::Once;
+
+use sqlx::{PgPool, Pool, Postgres};
 use tracing_subscriber;
 
 static INIT: Once = Once::new();
@@ -17,7 +18,7 @@ pub fn init_test_logging() {
 /// Create a test database pool
 pub async fn create_test_pool() -> Pool<Postgres> {
     init_test_logging();
-    
+
     let database_url = std::env::var("TEST_DATABASE_URL")
         .or_else(|_| std::env::var("DATABASE_URL"))
         .expect("TEST_DATABASE_URL or DATABASE_URL must be set for integration tests");
@@ -33,7 +34,9 @@ pub async fn cleanup_test_data(pool: &PgPool) {
     let _ = sqlx::query(r#"DELETE FROM "Message""#).execute(pool).await;
     let _ = sqlx::query(r#"DELETE FROM "Session""#).execute(pool).await;
     let _ = sqlx::query(r#"DELETE FROM "Account""#).execute(pool).await;
-    let _ = sqlx::query(r#"DELETE FROM "Verification""#).execute(pool).await;
+    let _ = sqlx::query(r#"DELETE FROM "Verification""#)
+        .execute(pool)
+        .await;
     let _ = sqlx::query(r#"DELETE FROM "Task""#).execute(pool).await;
     let _ = sqlx::query(r#"DELETE FROM "User""#).execute(pool).await;
 }

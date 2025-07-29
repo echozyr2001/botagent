@@ -1,12 +1,13 @@
-pub mod screen;
-pub mod mouse;
-pub mod keyboard;
 pub mod applications;
 pub mod files;
+pub mod keyboard;
+pub mod mouse;
+pub mod screen;
+
+use async_trait::async_trait;
+use bytebot_shared_rs::types::computer_action::{Button, Coordinates};
 
 use crate::error::AutomationError;
-use async_trait::async_trait;
-use bytebot_shared_rs::types::computer_action::{Coordinates, Button};
 
 /// Main automation service that coordinates all desktop automation operations
 #[derive(Debug, Clone)]
@@ -34,7 +35,11 @@ impl AutomationService {
 pub trait ComputerAutomation {
     async fn take_screenshot(&self) -> Result<String, AutomationError>;
     async fn move_mouse(&self, coordinates: Coordinates) -> Result<(), AutomationError>;
-    async fn click_mouse(&self, coordinates: Coordinates, button: Button) -> Result<(), AutomationError>;
+    async fn click_mouse(
+        &self,
+        coordinates: Coordinates,
+        button: Button,
+    ) -> Result<(), AutomationError>;
     async fn type_text(&self, text: &str) -> Result<(), AutomationError>;
     async fn press_keys(&self, keys: &[String]) -> Result<(), AutomationError>;
     async fn read_file(&self, path: &str) -> Result<String, AutomationError>;
@@ -51,7 +56,11 @@ impl ComputerAutomation for AutomationService {
         self.mouse.move_to(coordinates).await
     }
 
-    async fn click_mouse(&self, coordinates: Coordinates, button: Button) -> Result<(), AutomationError> {
+    async fn click_mouse(
+        &self,
+        coordinates: Coordinates,
+        button: Button,
+    ) -> Result<(), AutomationError> {
         self.mouse.click(coordinates, button).await
     }
 

@@ -1,16 +1,16 @@
-use async_trait::async_trait;
-use reqwest::{Client, StatusCode};
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::{error, warn};
 
-use crate::{config::Config, error::AIError};
+use async_trait::async_trait;
 use bytebot_shared_rs::types::{
     message::{Message, MessageContentBlock},
     task::Role,
 };
+use reqwest::{Client, StatusCode};
+use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
 
 use super::{AIService, ModelInfo};
+use crate::{config::Config, error::AIError};
 
 /// OpenAI API constants
 const OPENAI_API_BASE: &str = "https://api.openai.com/v1";
@@ -190,8 +190,7 @@ impl OpenAIService {
                     MessageContentBlock::ToolUse { name, id, input } => {
                         // OpenAI handles tool calls differently - they appear in assistant messages
                         // For now, convert to text representation
-                        let tool_text =
-                            format!("Tool call: {name} (id: {id}) with input: {input}");
+                        let tool_text = format!("Tool call: {name} (id: {id}) with input: {input}");
                         content.push(OpenAIContent::Text { text: tool_text });
                     }
                     MessageContentBlock::ToolResult {
@@ -459,8 +458,9 @@ impl AIService for OpenAIService {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytebot_shared_rs::types::message::Message;
+
+    use super::*;
 
     fn create_test_config() -> Config {
         Config {

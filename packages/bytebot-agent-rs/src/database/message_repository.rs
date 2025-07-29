@@ -1,14 +1,13 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{Pool, Postgres, Row};
-use tracing::{debug, error, info, warn};
-use uuid::Uuid;
-
 use bytebot_shared_rs::types::{
     api::PaginationParams,
     message::{Message, MessageContentBlock},
     task::Role,
 };
+use chrono::{DateTime, Utc};
+use sqlx::{Pool, Postgres, Row};
+use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 use super::DatabaseError;
 
@@ -46,7 +45,11 @@ pub struct UpdateMessageDto {
 pub trait MessageRepositoryTrait: Send + Sync {
     async fn create(&self, dto: &CreateMessageDto) -> Result<Message, DatabaseError>;
     async fn get_by_id(&self, id: &str) -> Result<Option<Message>, DatabaseError>;
-    async fn update(&self, id: &str, dto: &UpdateMessageDto) -> Result<Option<Message>, DatabaseError>;
+    async fn update(
+        &self,
+        id: &str,
+        dto: &UpdateMessageDto,
+    ) -> Result<Option<Message>, DatabaseError>;
     async fn delete(&self, id: &str) -> Result<bool, DatabaseError>;
     async fn list(
         &self,
@@ -61,7 +64,11 @@ pub trait MessageRepositoryTrait: Send + Sync {
     ) -> Result<(Vec<Message>, u64), DatabaseError>;
     async fn delete_by_task_id(&self, task_id: &str) -> Result<u64, DatabaseError>;
     async fn count_by_task_id(&self, task_id: &str) -> Result<u64, DatabaseError>;
-    async fn get_latest_by_task_id(&self, task_id: &str, limit: u32) -> Result<Vec<Message>, DatabaseError>;
+    async fn get_latest_by_task_id(
+        &self,
+        task_id: &str,
+        limit: u32,
+    ) -> Result<Vec<Message>, DatabaseError>;
 }
 
 /// SQLx-based message repository implementation
@@ -123,9 +130,15 @@ impl MessageRepository {
 
         if let Some(has_errors) = filter.has_errors {
             if has_errors {
-                conditions.push("content::jsonb @> '[{\"type\": \"tool_result\", \"is_error\": true}]'".to_string());
+                conditions.push(
+                    "content::jsonb @> '[{\"type\": \"tool_result\", \"is_error\": true}]'"
+                        .to_string(),
+                );
             } else {
-                conditions.push("NOT content::jsonb @> '[{\"type\": \"tool_result\", \"is_error\": true}]'".to_string());
+                conditions.push(
+                    "NOT content::jsonb @> '[{\"type\": \"tool_result\", \"is_error\": true}]'"
+                        .to_string(),
+                );
             }
         }
 
@@ -187,10 +200,11 @@ impl MessageRepositoryTrait for MessageRepository {
 
         let message_id = Uuid::new_v4().to_string();
         let now = Utc::now();
-        
+
         // Serialize content blocks to JSON
-        let content_json = serde_json::to_value(&dto.content)
-            .map_err(|e| DatabaseError::SerializationError(format!("Failed to serialize content: {e}")))?;
+        let content_json = serde_json::to_value(&dto.content).map_err(|e| {
+            DatabaseError::SerializationError(format!("Failed to serialize content: {e}"))
+        })?;
 
         let row = sqlx::query(
             r#"
@@ -228,9 +242,10 @@ impl MessageRepositoryTrait for MessageRepository {
         let message = Message {
             id: row.get("id"),
             content: row.get("content"),
-            role: row.get::<String, _>("role").parse().map_err(|_| {
-                DatabaseError::SerializationError("Invalid role".to_string())
-            })?,
+            role: row
+                .get::<String, _>("role")
+                .parse()
+                .map_err(|_| DatabaseError::SerializationError("Invalid role".to_string()))?,
             created_at: row.get("createdAt"),
             updated_at: row.get("updatedAt"),
             task_id: row.get("taskId"),
@@ -293,7 +308,11 @@ impl MessageRepositoryTrait for MessageRepository {
         Ok(message)
     }
 
-    async fn update(&self, id: &str, dto: &UpdateMessageDto) -> Result<Option<Message>, DatabaseError> {
+    async fn update(
+        &self,
+        id: &str,
+        dto: &UpdateMessageDto,
+    ) -> Result<Option<Message>, DatabaseError> {
         debug!("Updating message with ID: {}", id);
 
         // Get current message to preserve existing values
@@ -309,13 +328,17 @@ impl MessageRepositoryTrait for MessageRepository {
         let now = Utc::now();
         let content_json = if let Some(ref content) = dto.content {
             Self::validate_content(content)?;
-            serde_json::to_value(content)
-                .map_err(|e| DatabaseError::SerializationError(format!("Failed to serialize content: {e}")))?
+            serde_json::to_value(content).map_err(|e| {
+                DatabaseError::SerializationError(format!("Failed to serialize content: {e}"))
+            })?
         } else {
             current_message.content
         };
 
-        let summary_id = dto.summary_id.as_ref().or(current_message.summary_id.as_ref());
+        let summary_id = dto
+            .summary_id
+            .as_ref()
+            .or(current_message.summary_id.as_ref());
 
         let row = sqlx::query(
             r#"
@@ -367,7 +390,8 @@ impl MessageRepositoryTrait for MessageRepository {
         };
 
         Ok(message)
-    }    async fn delete(&self, id: &str) -> Result<bool, DatabaseError> {
+    }
+    async fn delete(&self, id: &str) -> Result<bool, DatabaseError> {
         debug!("Deleting message with ID: {}", id);
 
         let result = sqlx::query(r#"DELETE FROM "Message" WHERE id = $1"#)
@@ -516,7 +540,8 @@ impl MessageRepositoryTrait for MessageRepository {
         let messages = messages?;
         debug!("Found {} messages for task {}", messages.len(), task_id);
         Ok(messages)
-    }    async fn get_by_task_id_paginated(
+    }
+    async fn get_by_task_id_paginated(
         &self,
         task_id: &str,
         pagination: &PaginationParams,
@@ -528,15 +553,16 @@ impl MessageRepositoryTrait for MessageRepository {
         let offset = (page - 1) * limit;
 
         // Count total messages for this task
-        let total_count: i64 = sqlx::query(r#"SELECT COUNT(*) as count FROM "Message" WHERE "taskId" = $1"#)
-            .bind(task_id)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| {
-                error!("Failed to count messages for task {}: {}", task_id, e);
-                DatabaseError::QueryError(e)
-            })?
-            .get("count");
+        let total_count: i64 =
+            sqlx::query(r#"SELECT COUNT(*) as count FROM "Message" WHERE "taskId" = $1"#)
+                .bind(task_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    error!("Failed to count messages for task {}: {}", task_id, e);
+                    DatabaseError::QueryError(e)
+                })?
+                .get("count");
 
         // Fetch paginated results
         let rows = sqlx::query(
@@ -562,7 +588,10 @@ impl MessageRepositoryTrait for MessageRepository {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| {
-            error!("Failed to fetch paginated messages for task {}: {}", task_id, e);
+            error!(
+                "Failed to fetch paginated messages for task {}: {}",
+                task_id, e
+            );
             DatabaseError::QueryError(e)
         })?;
 
@@ -585,7 +614,12 @@ impl MessageRepositoryTrait for MessageRepository {
             .collect();
 
         let messages = messages?;
-        debug!("Found {} messages for task {} (total: {})", messages.len(), task_id, total_count);
+        debug!(
+            "Found {} messages for task {} (total: {})",
+            messages.len(),
+            task_id,
+            total_count
+        );
         Ok((messages, total_count as u64))
     }
 
@@ -602,28 +636,36 @@ impl MessageRepositoryTrait for MessageRepository {
             })?;
 
         let deleted_count = result.rows_affected();
-        info!("Successfully deleted {} messages for task {}", deleted_count, task_id);
+        info!(
+            "Successfully deleted {} messages for task {}",
+            deleted_count, task_id
+        );
         Ok(deleted_count)
     }
 
     async fn count_by_task_id(&self, task_id: &str) -> Result<u64, DatabaseError> {
         debug!("Counting messages for task: {}", task_id);
 
-        let count: i64 = sqlx::query(r#"SELECT COUNT(*) as count FROM "Message" WHERE "taskId" = $1"#)
-            .bind(task_id)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| {
-                error!("Failed to count messages for task {}: {}", task_id, e);
-                DatabaseError::QueryError(e)
-            })?
-            .get("count");
+        let count: i64 =
+            sqlx::query(r#"SELECT COUNT(*) as count FROM "Message" WHERE "taskId" = $1"#)
+                .bind(task_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    error!("Failed to count messages for task {}: {}", task_id, e);
+                    DatabaseError::QueryError(e)
+                })?
+                .get("count");
 
         debug!("Found {} messages for task {}", count, task_id);
         Ok(count as u64)
     }
 
-    async fn get_latest_by_task_id(&self, task_id: &str, limit: u32) -> Result<Vec<Message>, DatabaseError> {
+    async fn get_latest_by_task_id(
+        &self,
+        task_id: &str,
+        limit: u32,
+    ) -> Result<Vec<Message>, DatabaseError> {
         debug!("Fetching latest {} messages for task: {}", limit, task_id);
 
         let rows = sqlx::query(
@@ -648,7 +690,10 @@ impl MessageRepositoryTrait for MessageRepository {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| {
-            error!("Failed to fetch latest messages for task {}: {}", task_id, e);
+            error!(
+                "Failed to fetch latest messages for task {}: {}",
+                task_id, e
+            );
             DatabaseError::QueryError(e)
         })?;
 
@@ -671,7 +716,11 @@ impl MessageRepositoryTrait for MessageRepository {
             .collect();
 
         let messages = messages?;
-        debug!("Found {} latest messages for task {}", messages.len(), task_id);
+        debug!(
+            "Found {} latest messages for task {}",
+            messages.len(),
+            task_id
+        );
         Ok(messages)
     }
 }

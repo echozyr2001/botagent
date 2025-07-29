@@ -1,19 +1,19 @@
+use std::collections::HashMap;
+
 use axum::{
     extract::{Path, Query, State},
     response::Json,
     routing::get,
     Router,
 };
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use tracing::{debug, info};
-use validator::Validate;
-
 use bytebot_shared_rs::types::{
-    api::{AddTaskMessageDto, ApiResponse, PaginationParams, PaginatedResponse},
+    api::{AddTaskMessageDto, ApiResponse, PaginatedResponse, PaginationParams},
     message::{Message, MessageContentBlock},
     task::{Role, Task},
 };
+use serde::{Deserialize, Serialize};
+use tracing::{debug, info};
+use validator::Validate;
 
 use crate::{
     database::{
@@ -43,9 +43,15 @@ pub struct GroupedMessages {
 /// Create message-related routes
 pub fn create_message_routes() -> Router<AppState> {
     Router::new()
-        .route("/tasks/:id/messages", get(get_task_messages).post(add_task_message))
+        .route(
+            "/tasks/:id/messages",
+            get(get_task_messages).post(add_task_message),
+        )
         .route("/tasks/:id/messages/raw", get(get_task_raw_messages))
-        .route("/tasks/:id/messages/processed", get(get_task_processed_messages))
+        .route(
+            "/tasks/:id/messages/processed",
+            get(get_task_processed_messages),
+        )
 }
 
 /// Get messages for a task with pagination
@@ -66,10 +72,7 @@ async fn get_task_messages(
         .ok_or_else(|| ServiceError::NotFound(format!("Task with ID {task_id} not found")))?;
 
     // Parse pagination parameters
-    let page = params
-        .get("page")
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(1);
+    let page = params.get("page").and_then(|p| p.parse().ok()).unwrap_or(1);
     let limit = params
         .get("limit")
         .and_then(|l| l.parse().ok())
@@ -92,7 +95,12 @@ async fn get_task_messages(
         .await
         .map_err(ServiceError::Database)?;
 
-    debug!("Found {} messages for task {} (total: {})", messages.len(), task_id, total);
+    debug!(
+        "Found {} messages for task {} (total: {})",
+        messages.len(),
+        task_id,
+        total
+    );
 
     Ok(Json(PaginatedResponse::new(messages, page, limit, total)))
 }
@@ -137,7 +145,10 @@ async fn add_task_message(
         .map_err(ServiceError::Database)?;
 
     // Emit new message event via WebSocket
-    state.websocket_gateway.emit_new_message(&task_id, &message).await;
+    state
+        .websocket_gateway
+        .emit_new_message(&task_id, &message)
+        .await;
 
     info!("Successfully added message to task: {}", task_id);
 
@@ -163,10 +174,7 @@ async fn get_task_raw_messages(
         .ok_or_else(|| ServiceError::NotFound(format!("Task with ID {task_id} not found")))?;
 
     // Parse pagination parameters
-    let page = params
-        .get("page")
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(1);
+    let page = params.get("page").and_then(|p| p.parse().ok()).unwrap_or(1);
     let limit = params
         .get("limit")
         .and_then(|l| l.parse().ok())
@@ -189,7 +197,12 @@ async fn get_task_raw_messages(
         .await
         .map_err(ServiceError::Database)?;
 
-    debug!("Found {} raw messages for task {} (total: {})", messages.len(), task_id, total);
+    debug!(
+        "Found {} raw messages for task {} (total: {})",
+        messages.len(),
+        task_id,
+        total
+    );
 
     Ok(Json(PaginatedResponse::new(messages, page, limit, total)))
 }
@@ -212,10 +225,7 @@ async fn get_task_processed_messages(
         .ok_or_else(|| ServiceError::NotFound(format!("Task with ID {task_id} not found")))?;
 
     // Parse pagination parameters
-    let page = params
-        .get("page")
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(1);
+    let page = params.get("page").and_then(|p| p.parse().ok()).unwrap_or(1);
     let limit = params
         .get("limit")
         .and_then(|l| l.parse().ok())
@@ -242,7 +252,11 @@ async fn get_task_processed_messages(
     let processed_messages = filter_messages(messages)?;
     let grouped_messages = group_back_to_back_messages(processed_messages);
 
-    debug!("Processed {} message groups for task {}", grouped_messages.len(), task_id);
+    debug!(
+        "Processed {} message groups for task {}",
+        grouped_messages.len(),
+        task_id
+    );
 
     Ok(Json(ApiResponse::success(grouped_messages)))
 }
@@ -265,9 +279,9 @@ fn filter_messages(messages: Vec<Message>) -> Result<Vec<ProcessedMessage>, Serv
         // Process user messages
         if message.role == Role::User {
             // Check if all content blocks are tool results
-            let all_tool_results = content_blocks.iter().all(|block| {
-                matches!(block, MessageContentBlock::ToolResult { .. })
-            });
+            let all_tool_results = content_blocks
+                .iter()
+                .all(|block| matches!(block, MessageContentBlock::ToolResult { .. }));
 
             // Check if all content blocks are tool use or tool results (take over actions)
             let all_tool_actions = content_blocks.iter().all(|block| {
@@ -288,8 +302,12 @@ fn filter_messages(messages: Vec<Message>) -> Result<Vec<ProcessedMessage>, Serv
                     .collect();
 
                 if !tool_use_blocks.is_empty() {
-                    processed_message.message.set_content_blocks(tool_use_blocks)
-                        .map_err(|e| ServiceError::Internal(format!("Failed to set content blocks: {e}")))?;
+                    processed_message
+                        .message
+                        .set_content_blocks(tool_use_blocks)
+                        .map_err(|e| {
+                            ServiceError::Internal(format!("Failed to set content blocks: {e}"))
+                        })?;
                     processed_message.message.role = Role::Assistant;
                     processed_message.take_over = Some(true);
                 }
@@ -317,7 +335,7 @@ fn group_back_to_back_messages(messages: Vec<ProcessedMessage>) -> Vec<GroupedMe
             if group.role != role || group.take_over.unwrap_or(false) != is_take_over {
                 // Save the previous group
                 grouped_conversation.push(current_group.take().unwrap());
-                
+
                 // Start a new group
                 current_group = Some(GroupedMessages {
                     role,
@@ -348,10 +366,11 @@ fn group_back_to_back_messages(messages: Vec<ProcessedMessage>) -> Vec<GroupedMe
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytebot_shared_rs::types::message::MessageContentBlock;
     use serde_json::json;
     use uuid::Uuid;
+
+    use super::*;
 
     fn create_test_message(role: Role, content: Vec<MessageContentBlock>) -> Message {
         let mut message = Message::new(content, role, "test-task-id".to_string());
@@ -419,7 +438,10 @@ mod tests {
                 take_over: None,
             },
             ProcessedMessage {
-                message: create_test_message(Role::Assistant, vec![MessageContentBlock::text("Hi")]),
+                message: create_test_message(
+                    Role::Assistant,
+                    vec![MessageContentBlock::text("Hi")],
+                ),
                 take_over: None,
             },
         ];
@@ -436,11 +458,17 @@ mod tests {
     fn test_group_messages_with_takeover() {
         let messages = vec![
             ProcessedMessage {
-                message: create_test_message(Role::Assistant, vec![MessageContentBlock::text("Normal")]),
+                message: create_test_message(
+                    Role::Assistant,
+                    vec![MessageContentBlock::text("Normal")],
+                ),
                 take_over: None,
             },
             ProcessedMessage {
-                message: create_test_message(Role::Assistant, vec![MessageContentBlock::text("Takeover")]),
+                message: create_test_message(
+                    Role::Assistant,
+                    vec![MessageContentBlock::text("Takeover")],
+                ),
                 take_over: Some(true),
             },
         ];

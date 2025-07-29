@@ -1,7 +1,8 @@
-use crate::error::AutomationError;
 use bytebot_shared_rs::types::computer_action::Press;
 use enigo::{Enigo, Keyboard, Settings};
 use tracing::{debug, error};
+
+use crate::error::AutomationError;
 
 #[derive(Debug, Clone)]
 pub struct KeyboardService;
@@ -41,7 +42,11 @@ impl KeyboardService {
     }
 
     /// Type text with specified delay between characters
-    pub async fn type_text_with_delay(&self, text: &str, delay_ms: u64) -> Result<(), AutomationError> {
+    pub async fn type_text_with_delay(
+        &self,
+        text: &str,
+        delay_ms: u64,
+    ) -> Result<(), AutomationError> {
         debug!("Typing text with {}ms delay: {}", delay_ms, text);
 
         if text.is_empty() {
@@ -84,7 +89,11 @@ impl KeyboardService {
     }
 
     /// Press key with specified press type (up, down)
-    pub async fn press_key_with_type(&self, key: &str, press_type: Press) -> Result<(), AutomationError> {
+    pub async fn press_key_with_type(
+        &self,
+        key: &str,
+        press_type: Press,
+    ) -> Result<(), AutomationError> {
         debug!("Pressing key '{}' with type {:?}", key, press_type);
 
         let mut enigo = self.create_enigo()?;
@@ -129,10 +138,12 @@ impl KeyboardService {
 
         // Release all keys in reverse order
         for enigo_key in enigo_keys.iter().rev() {
-            enigo.key(*enigo_key, enigo::Direction::Release).map_err(|e| {
-                error!("Failed to release key: {}", e);
-                AutomationError::InputFailed(format!("Key release failed: {e}"))
-            })?;
+            enigo
+                .key(*enigo_key, enigo::Direction::Release)
+                .map_err(|e| {
+                    error!("Failed to release key: {}", e);
+                    AutomationError::InputFailed(format!("Key release failed: {e}"))
+                })?;
         }
 
         Ok(())
@@ -141,19 +152,22 @@ impl KeyboardService {
     /// Paste text from clipboard
     pub async fn paste(&self) -> Result<(), AutomationError> {
         debug!("Pasting from clipboard");
-        self.press_key_combination(&["ctrl".to_string(), "v".to_string()]).await
+        self.press_key_combination(&["ctrl".to_string(), "v".to_string()])
+            .await
     }
 
     /// Copy to clipboard
     pub async fn copy(&self) -> Result<(), AutomationError> {
         debug!("Copying to clipboard");
-        self.press_key_combination(&["ctrl".to_string(), "c".to_string()]).await
+        self.press_key_combination(&["ctrl".to_string(), "c".to_string()])
+            .await
     }
 
     /// Cut to clipboard
     pub async fn cut(&self) -> Result<(), AutomationError> {
         debug!("Cutting to clipboard");
-        self.press_key_combination(&["ctrl".to_string(), "x".to_string()]).await
+        self.press_key_combination(&["ctrl".to_string(), "x".to_string()])
+            .await
     }
 
     fn convert_key(&self, key: &str) -> Result<enigo::Key, AutomationError> {
@@ -169,19 +183,19 @@ impl KeyboardService {
             "end" => Ok(enigo::Key::End),
             "pageup" => Ok(enigo::Key::PageUp),
             "pagedown" => Ok(enigo::Key::PageDown),
-            
+
             // Arrow keys
             "up" | "arrowup" => Ok(enigo::Key::UpArrow),
             "down" | "arrowdown" => Ok(enigo::Key::DownArrow),
             "left" | "arrowleft" => Ok(enigo::Key::LeftArrow),
             "right" | "arrowright" => Ok(enigo::Key::RightArrow),
-            
+
             // Modifier keys
             "ctrl" | "control" => Ok(enigo::Key::Control),
             "alt" => Ok(enigo::Key::Alt),
             "shift" => Ok(enigo::Key::Shift),
             "meta" | "cmd" | "super" => Ok(enigo::Key::Meta),
-            
+
             // Function keys
             "f1" => Ok(enigo::Key::F1),
             "f2" => Ok(enigo::Key::F2),
@@ -195,13 +209,13 @@ impl KeyboardService {
             "f10" => Ok(enigo::Key::F10),
             "f11" => Ok(enigo::Key::F11),
             "f12" => Ok(enigo::Key::F12),
-            
+
             // Single character keys
             key if key.len() == 1 => {
                 let ch = key.chars().next().unwrap();
                 Ok(enigo::Key::Unicode(ch))
             }
-            
+
             _ => Err(AutomationError::InputFailed(format!("Unknown key: {key}"))),
         }
     }
@@ -214,21 +228,36 @@ mod tests {
     #[tokio::test]
     async fn test_keyboard_service_creation() {
         let result = KeyboardService::new();
-        assert!(result.is_ok(), "Keyboard service should initialize successfully");
+        assert!(
+            result.is_ok(),
+            "Keyboard service should initialize successfully"
+        );
     }
 
     #[tokio::test]
     async fn test_convert_key() {
         let service = KeyboardService::new().expect("Failed to create keyboard service");
-        
+
         // Test special keys
-        assert!(matches!(service.convert_key("enter"), Ok(enigo::Key::Return)));
-        assert!(matches!(service.convert_key("escape"), Ok(enigo::Key::Escape)));
-        assert!(matches!(service.convert_key("ctrl"), Ok(enigo::Key::Control)));
-        
+        assert!(matches!(
+            service.convert_key("enter"),
+            Ok(enigo::Key::Return)
+        ));
+        assert!(matches!(
+            service.convert_key("escape"),
+            Ok(enigo::Key::Escape)
+        ));
+        assert!(matches!(
+            service.convert_key("ctrl"),
+            Ok(enigo::Key::Control)
+        ));
+
         // Test single character
-        assert!(matches!(service.convert_key("a"), Ok(enigo::Key::Unicode('a'))));
-        
+        assert!(matches!(
+            service.convert_key("a"),
+            Ok(enigo::Key::Unicode('a'))
+        ));
+
         // Test unknown key
         assert!(service.convert_key("unknown_key").is_err());
     }

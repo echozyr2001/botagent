@@ -1,4 +1,5 @@
 use std::sync::Arc;
+
 use axum::{
     extract::{Request, State},
     http::StatusCode,
@@ -73,7 +74,10 @@ pub async fn auth_middleware(
         }
     };
 
-    debug!("Authentication successful for user: {}", auth_context.user.id);
+    debug!(
+        "Authentication successful for user: {}",
+        auth_context.user.id
+    );
 
     // Add auth context to request extensions
     request.extensions_mut().insert(auth_context);
@@ -106,7 +110,9 @@ pub async fn optional_auth_middleware(
             Ok(token) => token,
             Err(_) => {
                 // Invalid header format, but this is optional auth so continue without auth
-                debug!("Invalid authorization header format in optional auth, continuing without auth");
+                debug!(
+                    "Invalid authorization header format in optional auth, continuing without auth"
+                );
                 return Ok(next.run(request).await);
             }
         };
@@ -114,11 +120,17 @@ pub async fn optional_auth_middleware(
         // Validate token and get auth context
         match auth_service.validate_token(&token).await {
             Ok(auth_context) => {
-                debug!("Optional authentication successful for user: {}", auth_context.user.id);
+                debug!(
+                    "Optional authentication successful for user: {}",
+                    auth_context.user.id
+                );
                 request.extensions_mut().insert(auth_context);
             }
             Err(e) => {
-                debug!("Optional authentication failed: {}, continuing without auth", e);
+                debug!(
+                    "Optional authentication failed: {}, continuing without auth",
+                    e
+                );
                 // Continue without auth context
             }
         }
@@ -145,8 +157,6 @@ impl AuthContextExtractor for Request {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,7 +167,7 @@ mod tests {
         let request = axum::http::Request::builder()
             .body(axum::body::Body::empty())
             .unwrap();
-        
+
         // Test that the trait methods exist
         assert!(request.auth_context().is_none());
     }
