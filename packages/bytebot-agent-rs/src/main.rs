@@ -1,4 +1,5 @@
 mod ai;
+mod auth;
 mod config;
 mod database;
 mod error;
@@ -7,11 +8,9 @@ mod server;
 mod websocket;
 
 use anyhow::Result;
-use ai::UnifiedAIService;
 use config::Config;
-use database::{DatabaseManager, MigrationRunner};
-use server::{create_app, AppState};
-use websocket::WebSocketGateway;
+use database::MigrationRunner;
+use server::{create_app, create_app_state};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{error, info, Level};
@@ -43,51 +42,44 @@ async fn main() -> Result<()> {
     // Create database if it doesn't exist
     MigrationRunner::create_database_if_not_exists(&config.database_url).await?;
 
-    // Initialize database connection pool
-    let db_manager = DatabaseManager::new(&config.database_url).await.map_err(|e| {
-        error!("Failed to initialize database: {}", e);
-        e
-    })?;
+    // Run migrations first
+    let temp_pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&config.database_url)
+        .await
+        .map_err(|e| {
+            error!("Failed to create temporary database connection for migrations: {}", e);
+            e
+        })?;
 
-    info!("Database connection pool initialized");
-
-    // Run migrations
-    let migration_runner = MigrationRunner::new(db_manager.pool().clone());
+    let migration_runner = MigrationRunner::new(temp_pool.clone());
     migration_runner.run_migrations().await.map_err(|e| {
         error!("Failed to run migrations: {}", e);
         e
     })?;
 
     info!("Database migrations completed");
+    temp_pool.close().await;
 
-    // Perform health check
-    if !db_manager.is_ready().await {
-        error!("Database health check failed");
-        return Err(anyhow::anyhow!("Database is not ready"));
+    // Create application state with all services
+    let config_arc = Arc::new(config.clone());
+    let app_state = create_app_state(config_arc).await.map_err(|e| {
+        error!("Failed to create application state: {}", e);
+        anyhow::anyhow!("Failed to create application state: {}", e)
+    })?;
+
+    info!("Application state initialized successfully");
+    
+    // Log authentication status
+    if app_state.config.auth_enabled {
+        info!("Authentication is ENABLED");
+    } else {
+        info!("Authentication is DISABLED");
     }
 
-    info!("Database health check passed");
-
     // Log pool statistics
-    let stats = db_manager.pool_stats();
+    let stats = app_state.db.pool_stats();
     info!("Database pool stats - Size: {}, Idle: {}", stats.size, stats.idle);
-
-    // Initialize AI service
-    let ai_service = UnifiedAIService::new(&config);
-    info!("AI service initialized with {} available providers", 
-          ai_service.get_available_providers().len());
-
-    // Initialize WebSocket gateway
-    let websocket_gateway = WebSocketGateway::new();
-    info!("WebSocket gateway initialized");
-
-    // Create application state
-    let app_state = AppState {
-        config: Arc::new(config.clone()),
-        db: Arc::new(db_manager),
-        ai_service: Arc::new(ai_service),
-        websocket_gateway: Arc::new(websocket_gateway),
-    };
 
     // Create Axum application with middleware
     let app = create_app(app_state);

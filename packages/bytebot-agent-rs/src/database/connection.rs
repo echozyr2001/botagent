@@ -2,14 +2,18 @@ use sqlx::{postgres::PgPoolOptions, Pool, Postgres, Row};
 use std::time::Duration;
 use tracing::{error, info, warn};
 
-use super::{MessageRepository, MessageRepositoryTrait, TaskRepository, TaskRepositoryTrait};
+use super::{MessageRepository, MessageRepositoryTrait, TaskRepository, TaskRepositoryTrait, UserRepository, UserRepositoryTrait};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DatabaseError {
     #[error("Connection error: {0}")]
     Connection(sqlx::Error),
+    #[error("Connection error: {0}")]
+    ConnectionError(sqlx::Error),
     #[error("Migration error: {0}")]
     Migration(String),
+    #[error("Migration error: {0}")]
+    MigrationError(String),
     #[error("Health check failed: {0}")]
     HealthCheck(String),
     #[error("Query error: {0}")]
@@ -18,6 +22,8 @@ pub enum DatabaseError {
     ValidationError(String),
     #[error("Serialization error: {0}")]
     SerializationError(String),
+    #[error("Not found: {0}")]
+    NotFound(String),
     #[error("Invalid status transition from {from:?} to {to:?}")]
     InvalidStatusTransition {
         from: bytebot_shared_rs::types::task::TaskStatus,
@@ -67,6 +73,11 @@ impl DatabaseManager {
         &self.pool
     }
 
+    /// Get an Arc reference to the connection pool for sharing
+    pub fn get_pool(&self) -> std::sync::Arc<DatabasePool> {
+        std::sync::Arc::new(self.pool.clone())
+    }
+
     /// Perform a health check on the database connection
     pub async fn health_check(&self) -> Result<(), DatabaseError> {
         match sqlx::query("SELECT 1 as health_check")
@@ -113,6 +124,11 @@ impl DatabaseManager {
     /// Get a message repository instance
     pub fn message_repository(&self) -> impl MessageRepositoryTrait {
         MessageRepository::new(self.pool.clone())
+    }
+
+    /// Get a user repository instance
+    pub fn user_repository(&self) -> impl UserRepositoryTrait {
+        UserRepository::new(self.pool.clone())
     }
 
     /// Close the database connection pool

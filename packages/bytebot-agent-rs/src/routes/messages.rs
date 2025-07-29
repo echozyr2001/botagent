@@ -131,10 +131,13 @@ async fn add_task_message(
         summary_id: None,
     };
 
-    let _message = message_repo
+    let message = message_repo
         .create(&create_dto)
         .await
         .map_err(ServiceError::Database)?;
+
+    // Emit new message event via WebSocket
+    state.websocket_gateway.emit_new_message(&task_id, &message).await;
 
     info!("Successfully added message to task: {}", task_id);
 

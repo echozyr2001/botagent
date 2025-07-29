@@ -16,10 +16,11 @@ use tracing::Level;
 
 use crate::{
     ai::UnifiedAIService, 
+    auth::{AuthService, AuthServiceTrait, auth_middleware, optional_auth_middleware},
     config::Config, 
     database::DatabaseManager, 
     error::ServiceError, 
-    routes::{create_message_routes, create_task_routes},
+    routes::{create_auth_routes, create_message_routes, create_task_routes},
     websocket::WebSocketGateway,
 };
 
@@ -29,7 +30,39 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub db: Arc<DatabaseManager>,
     pub ai_service: Arc<UnifiedAIService>,
+    pub auth_service: Arc<dyn AuthServiceTrait>,
     pub websocket_gateway: Arc<WebSocketGateway>,
+}
+
+/// Create AppState with all services initialized
+pub async fn create_app_state(config: Arc<Config>) -> Result<AppState, ServiceError> {
+    // Initialize database manager
+    let db = Arc::new(
+        DatabaseManager::new(&config.database_url)
+            .await
+            .map_err(|e| ServiceError::Internal(format!("Database initialization failed: {e}")))?
+    );
+
+    // Initialize AI service
+    let ai_service = Arc::new(UnifiedAIService::new(&config));
+
+    // Initialize auth service
+    let auth_service: Arc<dyn AuthServiceTrait> = Arc::new(AuthService::new(
+        db.get_pool(),
+        config.jwt_secret.clone(),
+        config.auth_enabled,
+    ));
+
+    // Initialize WebSocket gateway
+    let websocket_gateway = Arc::new(WebSocketGateway::new());
+
+    Ok(AppState {
+        config,
+        db,
+        ai_service,
+        auth_service,
+        websocket_gateway,
+    })
 }
 
 /// Create the main Axum application with all middleware and routes
@@ -63,8 +96,19 @@ pub fn create_app(state: AppState) -> Router {
         .route("/health", get(health_check))
         .route("/api/health", get(health_check)) // Match global prefix pattern
         .route("/ws-stats", get(websocket_stats)) // WebSocket statistics endpoint
-        .merge(create_task_routes())
-        .merge(create_message_routes())
+        // Authentication routes (public)
+        .nest("/auth", create_auth_routes(
+            Arc::new(state.db.user_repository()),
+            state.auth_service.clone(),
+            state.config.jwt_secret.clone()
+        ))
+        // Protected routes that require authentication (when enabled)
+        .nest("/tasks", create_task_routes()
+            .layer(axum::middleware::from_fn_with_state(state.auth_service.clone(), auth_middleware)))
+        .nest("/messages", create_message_routes()
+            .layer(axum::middleware::from_fn_with_state(state.auth_service.clone(), optional_auth_middleware)))
+        // Integrate Socket.IO WebSocket server - socketioxide provides its own layer
+        .layer(state.websocket_gateway.layer())
         .with_state(state)
         .layer(middleware)
 }
@@ -143,8 +187,13 @@ mod tests {
             }
         };
         let ai_service = Arc::new(UnifiedAIService::new(&config));
+        let auth_service: Arc<dyn AuthServiceTrait> = Arc::new(AuthService::new(
+            db.get_pool(),
+            config.jwt_secret.clone(),
+            config.auth_enabled,
+        ));
         let websocket_gateway = Arc::new(WebSocketGateway::new());
-        let state = AppState { config, db, ai_service, websocket_gateway };
+        let state = AppState { config, db, ai_service, auth_service, websocket_gateway };
         create_app(state)
     }
 

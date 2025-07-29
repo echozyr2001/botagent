@@ -53,7 +53,7 @@ impl ConnectionManager {
     pub async fn join_task(&self, socket_id: String, task_id: String) -> Result<(), String> {
         debug!("Client {} joining task {}", socket_id, task_id);
         
-        let room_key = format!("task_{}", task_id);
+        let room_key = format!("task_{task_id}");
         
         // Add task to client's room list
         {
@@ -84,7 +84,7 @@ impl ConnectionManager {
     pub async fn leave_task(&self, socket_id: String, task_id: String) -> Result<(), String> {
         debug!("Client {} leaving task {}", socket_id, task_id);
         
-        let room_key = format!("task_{}", task_id);
+        let room_key = format!("task_{task_id}");
         
         // Remove task from client's room list
         {
@@ -115,7 +115,7 @@ impl ConnectionManager {
 
     /// Get all socket IDs in a specific task room
     pub async fn get_room_sockets(&self, task_id: &str) -> Vec<String> {
-        let room_key = format!("task_{}", task_id);
+        let room_key = format!("task_{task_id}");
         let rooms = self.rooms.read().await;
         rooms.get(&room_key).cloned().unwrap_or_default()
     }

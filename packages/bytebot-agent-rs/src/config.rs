@@ -9,6 +9,7 @@ pub struct Config {
     pub openai_api_key: Option<String>,
     pub google_api_key: Option<String>,
     pub auth_enabled: bool,
+    pub jwt_secret: String,
     pub cors_origins: Vec<String>,
     pub log_level: String,
     pub server: ServerConfig,
@@ -55,6 +56,8 @@ impl Default for Config {
                 .unwrap_or_else(|_| "false".to_string())
                 .parse()
                 .unwrap_or(false),
+            jwt_secret: env::var("JWT_SECRET")
+                .unwrap_or_else(|_| "default-jwt-secret-change-in-production".to_string()),
             cors_origins: env::var("CORS_ORIGINS")
                 .unwrap_or_else(|_| "http://localhost:3000".to_string())
                 .split(',')

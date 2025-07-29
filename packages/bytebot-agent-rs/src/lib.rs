@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod auth;
 pub mod config;
 pub mod database;
 pub mod error;
@@ -7,6 +8,7 @@ pub mod server;
 pub mod websocket;
 
 pub use ai::*;
+pub use auth::*;
 pub use config::*;
 pub use database::*;
 pub use error::*;

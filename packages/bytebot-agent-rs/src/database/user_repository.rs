@@ -108,6 +108,7 @@ pub trait UserRepositoryTrait: Send + Sync {
         access_token_expires_at: Option<DateTime<Utc>>,
         refresh_token_expires_at: Option<DateTime<Utc>>,
     ) -> Result<Option<Account>, DatabaseError>;
+    async fn update_account_password(&self, id: &str, password_hash: &str) -> Result<Option<Account>, DatabaseError>;
     async fn delete_account(&self, id: &str) -> Result<bool, DatabaseError>;
 
     // Verification operations
@@ -1081,6 +1082,72 @@ impl UserRepositoryTrait for UserRepository {
             }
             None => {
                 warn!("No account found to update tokens for ID: {}", id);
+                None
+            }
+        };
+
+        Ok(account)
+    }
+
+    async fn update_account_password(&self, id: &str, password_hash: &str) -> Result<Option<Account>, DatabaseError> {
+        debug!("Updating password for account: {}", id);
+
+        let now = Utc::now();
+
+        let row = sqlx::query(
+            r#"
+            UPDATE "Account"
+            SET 
+                password = $2,
+                "updatedAt" = $3
+            WHERE id = $1
+            RETURNING 
+                id,
+                "userId",
+                "accountId",
+                "providerId",
+                "accessToken",
+                "refreshToken",
+                "accessTokenExpiresAt",
+                "refreshTokenExpiresAt",
+                scope,
+                "idToken",
+                password,
+                "createdAt",
+                "updatedAt"
+            "#,
+        )
+        .bind(id)
+        .bind(password_hash)
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| {
+            error!("Failed to update account password {}: {}", id, e);
+            DatabaseError::QueryError(e)
+        })?;
+
+        let account = match row {
+            Some(row) => {
+                info!("Successfully updated password for account: {}", id);
+                Some(Account {
+                    id: row.get("id"),
+                    user_id: row.get("userId"),
+                    account_id: row.get("accountId"),
+                    provider_id: row.get("providerId"),
+                    access_token: row.get("accessToken"),
+                    refresh_token: row.get("refreshToken"),
+                    access_token_expires_at: row.get("accessTokenExpiresAt"),
+                    refresh_token_expires_at: row.get("refreshTokenExpiresAt"),
+                    scope: row.get("scope"),
+                    id_token: row.get("idToken"),
+                    password: row.get("password"),
+                    created_at: row.get("createdAt"),
+                    updated_at: row.get("updatedAt"),
+                })
+            }
+            None => {
+                warn!("No account found to update password for ID: {}", id);
                 None
             }
         };

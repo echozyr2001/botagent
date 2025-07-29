@@ -11,15 +11,12 @@ use tracing::{debug, info};
 use validator::Validate;
 
 use bytebot_shared_rs::types::{
-    api::{
-        ApiResponse, CreateTaskDto, PaginationParams, PaginatedResponse,
-        UpdateTaskDto,
-    },
+    api::{ApiResponse, CreateTaskDto, PaginatedResponse, PaginationParams, UpdateTaskDto},
     task::{Task, TaskStatus},
 };
 
 use crate::{
-    database::{task_repository::{TaskFilter, TaskRepositoryTrait}},
+    database::task_repository::{TaskFilter, TaskRepositoryTrait},
     error::{ServiceError, ServiceResult},
     server::AppState,
 };
@@ -57,6 +54,9 @@ async fn create_task(
         .await
         .map_err(ServiceError::Database)?;
 
+    // Emit task created event via WebSocket
+    state.websocket_gateway.emit_task_created(&task).await;
+
     info!("Successfully created task with ID: {}", task.id);
 
     Ok(Json(ApiResponse::success(task)))
@@ -71,10 +71,7 @@ async fn list_tasks(
     debug!("Listing tasks with params: {:?}", params);
 
     // Parse pagination parameters
-    let page = params
-        .get("page")
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(1);
+    let page = params.get("page").and_then(|p| p.parse().ok()).unwrap_or(1);
     let limit = params
         .get("limit")
         .and_then(|l| l.parse().ok())
@@ -148,7 +145,7 @@ async fn get_models(State(state): State<AppState>) -> ServiceResult<Json<ApiResp
 
     // Get models from the unified AI service
     let models = state.ai_service.list_all_models();
-    
+
     // Convert ModelInfo to JSON format expected by the frontend
     let model_json: Vec<Value> = models
         .into_iter()
@@ -161,9 +158,11 @@ async fn get_models(State(state): State<AppState>) -> ServiceResult<Json<ApiResp
         })
         .collect();
 
-    debug!("Returning {} available models from {} providers", 
-           model_json.len(), 
-           state.ai_service.get_available_providers().len());
+    debug!(
+        "Returning {} available models from {} providers",
+        model_json.len(),
+        state.ai_service.get_available_providers().len()
+    );
 
     Ok(Json(ApiResponse::success(model_json)))
 }
@@ -208,6 +207,9 @@ async fn update_task(
         .map_err(ServiceError::Database)?
         .ok_or_else(|| ServiceError::NotFound(format!("Task with ID {id} not found")))?;
 
+    // Emit task update event via WebSocket
+    state.websocket_gateway.emit_task_update(&id, &task).await;
+
     info!("Successfully updated task: {}", task.id);
 
     Ok(Json(ApiResponse::success(task)))
@@ -232,6 +234,9 @@ async fn delete_task(
             "Task with ID {id} not found"
         )));
     }
+
+    // Emit task deleted event via WebSocket
+    state.websocket_gateway.emit_task_deleted(&id).await;
 
     info!("Successfully deleted task: {}", id);
 
@@ -281,6 +286,9 @@ async fn takeover_task(
         .await
         .map_err(ServiceError::Database)?
         .ok_or_else(|| ServiceError::NotFound(format!("Task with ID {id} not found")))?;
+
+    // Emit task update event via WebSocket
+    state.websocket_gateway.emit_task_update(&id, &task).await;
 
     // Note: In a full implementation, we would also update the control field
     // This requires extending the UpdateTaskDto to include control field
@@ -333,6 +341,12 @@ async fn resume_task(
         .map_err(ServiceError::Database)?
         .ok_or_else(|| ServiceError::NotFound(format!("Task with ID {id} not found")))?;
 
+    // Emit task update event via WebSocket
+    state
+        .websocket_gateway
+        .emit_task_update(&id, &updated_task)
+        .await;
+
     info!("Successfully resumed task: {}", id);
 
     Ok(Json(ApiResponse::success(updated_task)))
@@ -369,6 +383,12 @@ async fn cancel_task(
         .map_err(ServiceError::Database)?
         .ok_or_else(|| ServiceError::NotFound(format!("Task with ID {id} not found")))?;
 
+    // Emit task update event via WebSocket
+    state
+        .websocket_gateway
+        .emit_task_update(&id, &updated_task)
+        .await;
+
     info!("Successfully cancelled task: {}", id);
 
     Ok(Json(ApiResponse::success(updated_task)))
@@ -385,32 +405,66 @@ mod tests {
     use std::sync::Arc;
     use tower::ServiceExt;
 
-    use crate::{ai::UnifiedAIService, config::Config, database::DatabaseManager};
+    use crate::{
+        ai::UnifiedAIService,
+        auth::{AuthService, AuthServiceTrait},
+        config::Config,
+        database::DatabaseManager,
+        websocket::WebSocketGateway,
+    };
 
     // Helper function to create test app state
     async fn create_test_state() -> AppState {
         let config = Arc::new(Config::default());
-        
+
         // For testing, we'll create a minimal state without real database connection
         // In a real test environment, you would set up a test database
         let database_url = "postgresql://localhost:5432/test_db";
-        
+
         // Try to create database manager, but if it fails, skip the test
         match DatabaseManager::new(database_url).await {
             Ok(db) => {
                 let ai_service = Arc::new(UnifiedAIService::new(&config));
+                let auth_service: Arc<dyn AuthServiceTrait> = Arc::new(AuthService::new(
+                    db.get_pool(),
+                    config.jwt_secret.clone(),
+                    config.auth_enabled,
+                ));
                 let websocket_gateway = Arc::new(WebSocketGateway::new());
                 AppState {
                     config,
                     db: Arc::new(db),
                     ai_service,
+                    auth_service,
                     websocket_gateway,
                 }
-            },
+            }
             Err(_) => {
                 // Return a dummy state for compilation - tests will be skipped
                 panic!("Test database not available - skipping integration tests");
             }
+        }
+    }
+
+    // Helper function to create test app state with specific config
+    async fn create_test_state_with_config(config: Arc<Config>) -> Option<AppState> {
+        let database_url = "postgresql://localhost:5432/nonexistent";
+        if let Ok(db) = DatabaseManager::new(database_url).await {
+            let ai_service = Arc::new(UnifiedAIService::new(&config));
+            let auth_service: Arc<dyn AuthServiceTrait> = Arc::new(AuthService::new(
+                db.get_pool(),
+                config.jwt_secret.clone(),
+                config.auth_enabled,
+            ));
+            Some(AppState {
+                config,
+                db: Arc::new(db),
+                ai_service,
+                auth_service,
+                websocket_gateway: Arc::new(WebSocketGateway::new()),
+            })
+        } else {
+            None
         }
     }
 
@@ -451,17 +505,7 @@ mod tests {
             ..Config::default()
         });
 
-        let ai_service = Arc::new(UnifiedAIService::new(&config));
-        
-        // Create a minimal database manager for testing
-        let database_url = "postgresql://localhost:5432/nonexistent";
-        if let Ok(db) = DatabaseManager::new(database_url).await {
-            let state = AppState {
-                config,
-                db: Arc::new(db),
-                ai_service,
-            };
-
+        if let Some(state) = create_test_state_with_config(config).await {
             let app = create_task_routes().with_state(state);
 
             let response = app
@@ -476,31 +520,33 @@ mod tests {
                 .unwrap();
 
             assert_eq!(response.status(), StatusCode::OK);
-            
+
             // Parse response body to verify structure
-            let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
             let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            
+
             // Verify response structure
             assert!(response_json["success"].as_bool().unwrap());
             let models = response_json["data"].as_array().unwrap();
-            
+
             // Should have models from all three providers (2 + 4 + 3 = 9 models)
             assert_eq!(models.len(), 9);
-            
+
             // Verify each model has required fields
             for model in models {
                 assert!(model["provider"].is_string());
                 assert!(model["name"].is_string());
                 assert!(model["title"].is_string());
             }
-            
+
             // Verify we have models from each provider
             let providers: std::collections::HashSet<String> = models
                 .iter()
                 .map(|m| m["provider"].as_str().unwrap().to_string())
                 .collect();
-            
+
             assert!(providers.contains("anthropic"));
             assert!(providers.contains("openai"));
             assert!(providers.contains("google"));
@@ -517,16 +563,7 @@ mod tests {
             ..Config::default()
         });
 
-        let ai_service = Arc::new(UnifiedAIService::new(&config));
-        
-        let database_url = "postgresql://localhost:5432/nonexistent";
-        if let Ok(db) = DatabaseManager::new(database_url).await {
-            let state = AppState {
-                config,
-                db: Arc::new(db),
-                ai_service,
-            };
-
+        if let Some(state) = create_test_state_with_config(config).await {
             let app = create_task_routes().with_state(state);
 
             let response = app
@@ -541,15 +578,17 @@ mod tests {
                 .unwrap();
 
             assert_eq!(response.status(), StatusCode::OK);
-            
-            let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
             let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            
+
             let models = response_json["data"].as_array().unwrap();
-            
+
             // Should only have OpenAI models (4 models)
             assert_eq!(models.len(), 4);
-            
+
             // All models should be from OpenAI
             for model in models {
                 assert_eq!(model["provider"].as_str().unwrap(), "openai");
@@ -567,16 +606,7 @@ mod tests {
             ..Config::default()
         });
 
-        let ai_service = Arc::new(UnifiedAIService::new(&config));
-        
-        let database_url = "postgresql://localhost:5432/nonexistent";
-        if let Ok(db) = DatabaseManager::new(database_url).await {
-            let state = AppState {
-                config,
-                db: Arc::new(db),
-                ai_service,
-            };
-
+        if let Some(state) = create_test_state_with_config(config).await {
             let app = create_task_routes().with_state(state);
 
             let response = app
@@ -591,12 +621,14 @@ mod tests {
                 .unwrap();
 
             assert_eq!(response.status(), StatusCode::OK);
-            
-            let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
             let response_json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            
+
             let models = response_json["data"].as_array().unwrap();
-            
+
             // Should have no models when no API keys are configured
             assert_eq!(models.len(), 0);
         }
@@ -606,10 +638,10 @@ mod tests {
     async fn test_route_registration() {
         // Test that all routes are properly registered
         let _config = Arc::new(Config::default());
-        
+
         // This test just verifies the routes compile and are registered
         let routes = create_task_routes();
-        
+
         // Verify the router was created successfully
         assert!(!format!("{routes:?}").is_empty());
     }

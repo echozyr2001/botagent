@@ -15,9 +15,10 @@ use super::{
 
 /// WebSocket gateway that provides Socket.IO compatible interface
 /// This matches the functionality of the TypeScript TasksGateway
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct WebSocketGateway {
     io: SocketIo,
+    layer: socketioxide::layer::SocketIoLayer<socketioxide::adapter::LocalAdapter>,
     connection_manager: Arc<ConnectionManager>,
 }
 
@@ -27,10 +28,11 @@ impl WebSocketGateway {
         let connection_manager = Arc::new(ConnectionManager::new());
         
         // Create Socket.IO server with CORS configuration matching TypeScript
-        let (_, io) = SocketIo::new_svc();
+        let (layer, io) = SocketIo::new_layer();
 
         let gateway = Self {
             io: io.clone(),
+            layer,
             connection_manager: connection_manager.clone(),
         };
 
@@ -38,6 +40,11 @@ impl WebSocketGateway {
         gateway.setup_handlers(connection_manager);
         
         gateway
+    }
+
+    /// Get the Socket.IO layer for Axum integration
+    pub fn layer(&self) -> socketioxide::layer::SocketIoLayer<socketioxide::adapter::LocalAdapter> {
+        self.layer.clone()
     }
 
     /// Get a reference to the Socket.IO instance
@@ -86,7 +93,7 @@ impl WebSocketGateway {
                             Err(e) => {
                                 warn!("Failed to join task: {}", e);
                                 let response = ServerMessage::Error { 
-                                    message: format!("Failed to join task: {}", e) 
+                                    message: format!("Failed to join task: {e}") 
                                 };
                                 if let Err(e) = socket.emit("error", response) {
                                     error!("Failed to emit error: {}", e);
@@ -114,7 +121,7 @@ impl WebSocketGateway {
                             Err(e) => {
                                 warn!("Failed to leave task: {}", e);
                                 let response = ServerMessage::Error { 
-                                    message: format!("Failed to leave task: {}", e) 
+                                    message: format!("Failed to leave task: {e}") 
                                 };
                                 if let Err(e) = socket.emit("error", response) {
                                     error!("Failed to emit error: {}", e);
@@ -149,7 +156,7 @@ impl WebSocketGateway {
         connection_manager
             .join_task(socket.id.to_string(), task_id.clone())
             .await
-            .map_err(|e| ServiceError::Internal(format!("Failed to join task room: {}", e)))?;
+            .map_err(|e| ServiceError::Internal(format!("Failed to join task room: {e}")))?;
 
         info!("Client {} joined task {}", socket.id, task_id);
         Ok(task_id)
@@ -177,7 +184,7 @@ impl WebSocketGateway {
         connection_manager
             .leave_task(socket.id.to_string(), task_id.clone())
             .await
-            .map_err(|e| ServiceError::Internal(format!("Failed to leave task room: {}", e)))?;
+            .map_err(|e| ServiceError::Internal(format!("Failed to leave task room: {e}")))?;
 
         info!("Client {} left task {}", socket.id, task_id);
         Ok(task_id)
@@ -186,7 +193,7 @@ impl WebSocketGateway {
     /// Emit task update to all clients in the task room
     /// Matches emitTaskUpdate from TypeScript implementation
     pub async fn emit_task_update(&self, task_id: &str, task: &Task) {
-        let room_name = format!("task_{}", task_id);
+        let room_name = format!("task_{task_id}");
         let message = ServerMessage::TaskUpdated { task: task.clone() };
         
         if let Err(e) = self.io.to(room_name.clone()).emit("task_updated", message) {
@@ -199,7 +206,7 @@ impl WebSocketGateway {
     /// Emit new message to all clients in the task room
     /// Matches emitNewMessage from TypeScript implementation
     pub async fn emit_new_message(&self, task_id: &str, message: &Message) {
-        let room_name = format!("task_{}", task_id);
+        let room_name = format!("task_{task_id}");
         let server_message = ServerMessage::NewMessage { message: message.clone() };
         
         if let Err(e) = self.io.to(room_name.clone()).emit("new_message", server_message) {
@@ -240,7 +247,7 @@ impl WebSocketGateway {
 
     /// Broadcast a generic event to all clients in a task room
     pub async fn broadcast_to_task(&self, task_id: &str, event_name: &str, data: impl serde::Serialize) {
-        let room_name = format!("task_{}", task_id);
+        let room_name = format!("task_{task_id}");
         let event_name = event_name.to_string();
         
         if let Err(e) = self.io.to(room_name.clone()).emit(event_name.clone(), data) {
