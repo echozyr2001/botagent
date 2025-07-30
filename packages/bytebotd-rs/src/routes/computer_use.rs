@@ -21,9 +21,9 @@ pub async fn handle_computer_action(
     // Validate the action before processing
     if let Err(validation_error) = action.validate() {
         warn!("Invalid computer action received: {}", validation_error);
-        return Err(ServiceError::Automation(crate::error::AutomationError::Validation(
-            validation_error.to_string(),
-        )));
+        return Err(ServiceError::Automation(
+            crate::error::AutomationError::Validation(validation_error.to_string()),
+        ));
     }
 
     let result = match action {
@@ -31,7 +31,10 @@ pub async fn handle_computer_action(
             debug!("Taking screenshot");
             match automation_service.take_screenshot().await {
                 Ok(screenshot) => {
-                    info!("Successfully captured screenshot ({} bytes)", screenshot.len());
+                    info!(
+                        "Successfully captured screenshot ({} bytes)",
+                        screenshot.len()
+                    );
                     json!({
                         "success": true,
                         "action": "screenshot",
@@ -52,7 +55,10 @@ pub async fn handle_computer_action(
             debug!("Moving mouse to ({}, {})", coordinates.x, coordinates.y);
             match automation_service.move_mouse(coordinates).await {
                 Ok(()) => {
-                    debug!("Successfully moved mouse to ({}, {})", coordinates.x, coordinates.y);
+                    debug!(
+                        "Successfully moved mouse to ({}, {})",
+                        coordinates.x, coordinates.y
+                    );
                     json!({
                         "success": true,
                         "action": "move_mouse",
@@ -62,7 +68,10 @@ pub async fn handle_computer_action(
                     })
                 }
                 Err(e) => {
-                    error!("Failed to move mouse to ({}, {}): {}", coordinates.x, coordinates.y, e);
+                    error!(
+                        "Failed to move mouse to ({}, {}): {}",
+                        coordinates.x, coordinates.y, e
+                    );
                     return Err(ServiceError::Automation(e));
                 }
             }
@@ -167,45 +176,58 @@ pub async fn handle_computer_action(
 
         ComputerAction::ReadFile { path } => {
             debug!("Reading file: {}", path);
-            
+
             // Enhanced validation for file operations
             if path.is_empty() {
                 error!("Empty file path provided");
-                return Err(ServiceError::Automation(crate::error::AutomationError::InvalidPath(
-                    "File path cannot be empty".to_string(),
-                )));
+                return Err(ServiceError::Automation(
+                    crate::error::AutomationError::InvalidPath(
+                        "File path cannot be empty".to_string(),
+                    ),
+                ));
             }
 
             if path.len() > 4096 {
                 error!("File path too long: {} characters", path.len());
-                return Err(ServiceError::Automation(crate::error::AutomationError::InvalidPath(
-                    "File path too long (maximum 4096 characters)".to_string(),
-                )));
+                return Err(ServiceError::Automation(
+                    crate::error::AutomationError::InvalidPath(
+                        "File path too long (maximum 4096 characters)".to_string(),
+                    ),
+                ));
             }
 
             // Check for suspicious patterns in path
             let suspicious_patterns = ["../", "..\\", "~", "$", "`", ";", "|", "&"];
             for pattern in &suspicious_patterns {
                 if path.contains(pattern) {
-                    warn!("Suspicious pattern '{}' detected in file path: {}", pattern, path);
-                    return Err(ServiceError::Automation(crate::error::AutomationError::InvalidPath(
-                        format!("Suspicious pattern '{pattern}' not allowed in file path"),
-                    )));
+                    warn!(
+                        "Suspicious pattern '{}' detected in file path: {}",
+                        pattern, path
+                    );
+                    return Err(ServiceError::Automation(
+                        crate::error::AutomationError::InvalidPath(format!(
+                            "Suspicious pattern '{pattern}' not allowed in file path"
+                        )),
+                    ));
                 }
             }
 
             match automation_service.read_file(&path).await {
                 Ok(content) => {
-                    info!("Successfully read file: {} ({} bytes base64)", path, content.len());
-                    
+                    info!(
+                        "Successfully read file: {} ({} bytes base64)",
+                        path,
+                        content.len()
+                    );
+
                     // Log file type information for monitoring
                     let file_extension = std::path::Path::new(&path)
                         .extension()
                         .and_then(|ext| ext.to_str())
                         .unwrap_or("unknown");
-                    
+
                     debug!("File type: .{}", file_extension);
-                    
+
                     json!({
                         "success": true,
                         "action": "read_file",
@@ -227,37 +249,48 @@ pub async fn handle_computer_action(
 
         ComputerAction::WriteFile { path, data } => {
             debug!("Writing file: {} ({} bytes base64)", path, data.len());
-            
+
             // Enhanced validation for file operations
             if path.is_empty() {
                 error!("Empty file path provided");
-                return Err(ServiceError::Automation(crate::error::AutomationError::InvalidPath(
-                    "File path cannot be empty".to_string(),
-                )));
+                return Err(ServiceError::Automation(
+                    crate::error::AutomationError::InvalidPath(
+                        "File path cannot be empty".to_string(),
+                    ),
+                ));
             }
 
             if path.len() > 4096 {
                 error!("File path too long: {} characters", path.len());
-                return Err(ServiceError::Automation(crate::error::AutomationError::InvalidPath(
-                    "File path too long (maximum 4096 characters)".to_string(),
-                )));
+                return Err(ServiceError::Automation(
+                    crate::error::AutomationError::InvalidPath(
+                        "File path too long (maximum 4096 characters)".to_string(),
+                    ),
+                ));
             }
 
             if data.is_empty() {
                 error!("Empty data provided for file write");
-                return Err(ServiceError::Automation(crate::error::AutomationError::Validation(
-                    "Cannot write empty data to file".to_string(),
-                )));
+                return Err(ServiceError::Automation(
+                    crate::error::AutomationError::Validation(
+                        "Cannot write empty data to file".to_string(),
+                    ),
+                ));
             }
 
             // Check for suspicious patterns in path
             let suspicious_patterns = ["../", "..\\", "~", "$", "`", ";", "|", "&"];
             for pattern in &suspicious_patterns {
                 if path.contains(pattern) {
-                    warn!("Suspicious pattern '{}' detected in file path: {}", pattern, path);
-                    return Err(ServiceError::Automation(crate::error::AutomationError::InvalidPath(
-                        format!("Suspicious pattern '{pattern}' not allowed in file path"),
-                    )));
+                    warn!(
+                        "Suspicious pattern '{}' detected in file path: {}",
+                        pattern, path
+                    );
+                    return Err(ServiceError::Automation(
+                        crate::error::AutomationError::InvalidPath(format!(
+                            "Suspicious pattern '{pattern}' not allowed in file path"
+                        )),
+                    ));
                 }
             }
 
@@ -269,17 +302,21 @@ pub async fn handle_computer_action(
                 }
                 Err(decode_err) => {
                     error!("Invalid base64 data for file {}: {}", path, decode_err);
-                    return Err(ServiceError::Automation(crate::error::AutomationError::Validation(
-                        format!("Invalid base64 data: {decode_err}"),
-                    )));
+                    return Err(ServiceError::Automation(
+                        crate::error::AutomationError::Validation(format!(
+                            "Invalid base64 data: {decode_err}"
+                        )),
+                    ));
                 }
             };
 
             // Additional size validation
             if decoded_size == 0 {
-                return Err(ServiceError::Automation(crate::error::AutomationError::Validation(
-                    "Decoded file content is empty".to_string(),
-                )));
+                return Err(ServiceError::Automation(
+                    crate::error::AutomationError::Validation(
+                        "Decoded file content is empty".to_string(),
+                    ),
+                ));
             }
 
             // Log file type information for monitoring
@@ -287,13 +324,17 @@ pub async fn handle_computer_action(
                 .extension()
                 .and_then(|ext| ext.to_str())
                 .unwrap_or("unknown");
-            
+
             debug!("Writing file type: .{}", file_extension);
 
             match automation_service.write_file(&path, &data).await {
                 Ok(()) => {
-                    info!("Successfully wrote file: {} ({} bytes base64, {} bytes decoded)", 
-                          path, data.len(), decoded_size);
+                    info!(
+                        "Successfully wrote file: {} ({} bytes base64, {} bytes decoded)",
+                        path,
+                        data.len(),
+                        decoded_size
+                    );
                     json!({
                         "success": true,
                         "action": "write_file",
@@ -466,9 +507,10 @@ pub async fn handle_computer_action(
 
 #[cfg(test)]
 mod tests {
+    use bytebot_shared_rs::types::computer_action::Coordinates;
+
     use super::*;
     use crate::automation::AutomationService;
-    use bytebot_shared_rs::types::computer_action::Coordinates;
 
     #[tokio::test]
     async fn test_screenshot_action() {
@@ -694,7 +736,9 @@ mod tests {
                 println!("Application switching failed (expected in test env): {e}");
                 // Verify it's the correct error type
                 match e {
-                    ServiceError::Automation(crate::error::AutomationError::ApplicationFailed(_)) => {
+                    ServiceError::Automation(crate::error::AutomationError::ApplicationFailed(
+                        _,
+                    )) => {
                         // This is the expected error type
                     }
                     _ => panic!("Expected ApplicationFailed error, got: {e:?}"),
@@ -710,7 +754,8 @@ mod tests {
 
         // Test writing a file
         let test_content = "Hello, World!";
-        let base64_content = base64::engine::general_purpose::STANDARD.encode(test_content.as_bytes());
+        let base64_content =
+            base64::engine::general_purpose::STANDARD.encode(test_content.as_bytes());
         let test_file_path = "./test_api_file.txt";
 
         let write_action = ComputerAction::WriteFile {
@@ -718,28 +763,33 @@ mod tests {
             data: base64_content.clone(),
         };
 
-        let write_result = handle_computer_action(State(automation_service.clone()), Json(write_action)).await;
+        let write_result =
+            handle_computer_action(State(automation_service.clone()), Json(write_action)).await;
         assert!(write_result.is_ok(), "Write file action should succeed");
 
         let write_response = write_result.unwrap().0;
         assert_eq!(write_response["success"], true);
         assert_eq!(write_response["action"], "write_file");
         assert_eq!(write_response["result"]["path"], test_file_path);
-        assert_eq!(write_response["result"]["bytes_written_base64"], base64_content.len());
+        assert_eq!(
+            write_response["result"]["bytes_written_base64"],
+            base64_content.len()
+        );
 
         // Test reading the file back
         let read_action = ComputerAction::ReadFile {
             path: test_file_path.to_string(),
         };
 
-        let read_result = handle_computer_action(State(automation_service), Json(read_action)).await;
+        let read_result =
+            handle_computer_action(State(automation_service), Json(read_action)).await;
         assert!(read_result.is_ok(), "Read file action should succeed");
 
         let read_response = read_result.unwrap().0;
         assert_eq!(read_response["success"], true);
         assert_eq!(read_response["action"], "read_file");
         assert_eq!(read_response["result"]["path"], test_file_path);
-        
+
         // Verify the content matches
         let returned_content = read_response["result"]["content"].as_str().unwrap();
         assert_eq!(returned_content, base64_content);
@@ -758,7 +808,9 @@ mod tests {
             path: "".to_string(),
         };
 
-        let result = handle_computer_action(State(automation_service.clone()), Json(empty_path_action)).await;
+        let result =
+            handle_computer_action(State(automation_service.clone()), Json(empty_path_action))
+                .await;
         assert!(result.is_err(), "Empty path should fail");
 
         // Test suspicious path
@@ -766,7 +818,11 @@ mod tests {
             path: "../../../etc/passwd".to_string(),
         };
 
-        let result = handle_computer_action(State(automation_service.clone()), Json(suspicious_path_action)).await;
+        let result = handle_computer_action(
+            State(automation_service.clone()),
+            Json(suspicious_path_action),
+        )
+        .await;
         assert!(result.is_err(), "Suspicious path should fail");
 
         // Test invalid base64 data
@@ -775,7 +831,8 @@ mod tests {
             data: "invalid-base64-data!@#$%".to_string(),
         };
 
-        let result = handle_computer_action(State(automation_service), Json(invalid_base64_action)).await;
+        let result =
+            handle_computer_action(State(automation_service), Json(invalid_base64_action)).await;
         assert!(result.is_err(), "Invalid base64 data should fail");
     }
 

@@ -70,72 +70,72 @@ impl IntoResponse for ServiceError {
             ServiceError::Automation(AutomationError::InvalidCoordinates { x, y }) => (
                 StatusCode::BAD_REQUEST,
                 format!("Invalid coordinates: x={x}, y={y}"),
-                "INVALID_COORDINATES"
+                "INVALID_COORDINATES",
             ),
             ServiceError::Automation(AutomationError::InvalidPath(path)) => (
                 StatusCode::BAD_REQUEST,
                 format!("Invalid file path: {path}"),
-                "INVALID_PATH"
+                "INVALID_PATH",
             ),
             ServiceError::Automation(AutomationError::FileTooLarge { size, limit }) => (
                 StatusCode::BAD_REQUEST,
                 format!("File too large: {size} MB exceeds limit of {limit} MB"),
-                "FILE_TOO_LARGE"
+                "FILE_TOO_LARGE",
             ),
             ServiceError::Automation(AutomationError::UnsupportedOperation(op)) => (
                 StatusCode::BAD_REQUEST,
                 format!("Unsupported operation: {op}"),
-                "UNSUPPORTED_OPERATION"
+                "UNSUPPORTED_OPERATION",
             ),
             ServiceError::Automation(AutomationError::ScreenshotFailed(msg)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Screenshot failed: {msg}"),
-                "SCREENSHOT_FAILED"
+                "SCREENSHOT_FAILED",
             ),
             ServiceError::Automation(AutomationError::InputFailed(msg)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Input simulation failed: {msg}"),
-                "INPUT_FAILED"
+                "INPUT_FAILED",
             ),
             ServiceError::Automation(AutomationError::FileFailed(msg)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("File operation failed: {msg}"),
-                "FILE_OPERATION_FAILED"
+                "FILE_OPERATION_FAILED",
             ),
             ServiceError::Automation(AutomationError::ApplicationFailed(msg)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Application switching failed: {msg}"),
-                "APPLICATION_FAILED"
+                "APPLICATION_FAILED",
             ),
             ServiceError::Automation(AutomationError::System(msg)) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("System error: {msg}"),
-                "SYSTEM_ERROR"
+                "SYSTEM_ERROR",
             ),
             ServiceError::Serialization(e) => (
                 StatusCode::BAD_REQUEST,
                 format!("Invalid request format: {e}"),
-                "SERIALIZATION_ERROR"
+                "SERIALIZATION_ERROR",
             ),
             ServiceError::Io(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("IO error: {e}"),
-                "IO_ERROR"
+                "IO_ERROR",
             ),
             ServiceError::Image(e) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Image processing error: {e}"),
-                "IMAGE_ERROR"
+                "IMAGE_ERROR",
             ),
             ServiceError::Base64(e) => (
                 StatusCode::BAD_REQUEST,
                 format!("Base64 decode error: {e}"),
-                "BASE64_ERROR"
+                "BASE64_ERROR",
             ),
             ServiceError::Internal(msg) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("Internal server error: {msg}"),
-                "INTERNAL_ERROR"
+                "INTERNAL_ERROR",
             ),
         };
 

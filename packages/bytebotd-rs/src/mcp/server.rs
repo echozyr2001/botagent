@@ -9,9 +9,8 @@ use axum::{
 };
 use tracing::{error, info};
 
-use crate::{automation::AutomationService, error::AutomationError};
-
 use super::tools::ComputerUseTools;
+use crate::{automation::AutomationService, error::AutomationError};
 
 /// MCP Server implementation for ByteBot desktop automation
 #[derive(Clone)]

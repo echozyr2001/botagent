@@ -103,7 +103,10 @@ impl FileService {
         // Check decoded content size
         let content_size_mb = content.len() as u64 / (1024 * 1024);
         if content_size_mb > self.max_file_size_mb {
-            warn!("File size {} MB exceeds limit of {} MB", content_size_mb, self.max_file_size_mb);
+            warn!(
+                "File size {} MB exceeds limit of {} MB",
+                content_size_mb, self.max_file_size_mb
+            );
             return Err(AutomationError::FileTooLarge {
                 size: content_size_mb,
                 limit: self.max_file_size_mb,
@@ -116,8 +119,10 @@ impl FileService {
         // Check if file already exists and get backup if needed
         let backup_needed = path.exists();
         let backup_path = if backup_needed {
-            Some(path.with_extension(format!("{}.backup", 
-                path.extension().and_then(|e| e.to_str()).unwrap_or("tmp"))))
+            Some(path.with_extension(format!(
+                "{}.backup",
+                path.extension().and_then(|e| e.to_str()).unwrap_or("tmp")
+            )))
         } else {
             None
         };
@@ -147,18 +152,22 @@ impl FileService {
         // Write file content
         match fs::write(&path, &content).await {
             Ok(()) => {
-                info!("Successfully wrote file: {} ({} bytes)", path.display(), content.len());
-                
+                info!(
+                    "Successfully wrote file: {} ({} bytes)",
+                    path.display(),
+                    content.len()
+                );
+
                 // Clean up backup if write was successful
                 if let Some(backup) = backup_path {
                     let _ = fs::remove_file(backup).await; // Ignore errors for cleanup
                 }
-                
+
                 Ok(())
             }
             Err(e) => {
                 error!("Failed to write file {}: {}", path.display(), e);
-                
+
                 // Restore from backup if available
                 if let Some(backup) = backup_path {
                     if backup.exists() {
@@ -170,8 +179,10 @@ impl FileService {
                         let _ = fs::remove_file(backup).await; // Clean up backup
                     }
                 }
-                
-                Err(AutomationError::FileFailed(format!("Failed to write file: {e}")))
+
+                Err(AutomationError::FileFailed(format!(
+                    "Failed to write file: {e}"
+                )))
             }
         }
     }
@@ -181,24 +192,38 @@ impl FileService {
         // Check for executable file extensions and warn
         if let Some(extension) = path.extension().and_then(|e| e.to_str()) {
             let executable_extensions = [
-                "exe", "bat", "cmd", "com", "scr", "pif", "vbs", "js", "jar",
-                "sh", "bash", "zsh", "fish", "py", "pl", "rb", "php"
+                "exe", "bat", "cmd", "com", "scr", "pif", "vbs", "js", "jar", "sh", "bash", "zsh",
+                "fish", "py", "pl", "rb", "php",
             ];
-            
-            if executable_extensions.iter().any(|&ext| ext.eq_ignore_ascii_case(extension)) {
+
+            if executable_extensions
+                .iter()
+                .any(|&ext| ext.eq_ignore_ascii_case(extension))
+            {
                 warn!("Writing potentially executable file: {}", path.display());
-                
+
                 // Additional check for script content
                 if let Ok(text_content) = std::str::from_utf8(content) {
                     let dangerous_patterns = [
-                        "#!/bin/", "#!/usr/bin/", "@echo off", "powershell",
-                        "cmd.exe", "system(", "exec(", "eval(", "subprocess"
+                        "#!/bin/",
+                        "#!/usr/bin/",
+                        "@echo off",
+                        "powershell",
+                        "cmd.exe",
+                        "system(",
+                        "exec(",
+                        "eval(",
+                        "subprocess",
                     ];
-                    
+
                     for pattern in &dangerous_patterns {
-                        if text_content.to_lowercase().contains(&pattern.to_lowercase()) {
+                        if text_content
+                            .to_lowercase()
+                            .contains(&pattern.to_lowercase())
+                        {
                             return Err(AutomationError::Validation(
-                                "File contains potentially dangerous executable content".to_string(),
+                                "File contains potentially dangerous executable content"
+                                    .to_string(),
                             ));
                         }
                     }
@@ -214,7 +239,7 @@ impl FileService {
                     "Cannot write Windows executable files".to_string(),
                 ));
             }
-            
+
             // Look for ELF header (Linux executable)
             if content.len() > 4 && &content[0..4] == b"\x7fELF" {
                 return Err(AutomationError::Validation(
@@ -359,15 +384,20 @@ impl FileService {
         }
 
         // Additional safety check: prevent deletion of important files
-        let file_name = path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
-        
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
         let protected_files = [
-            ".env", ".env.local", ".env.production", 
-            "package.json", "Cargo.toml", "requirements.txt",
-            "docker-compose.yml", "Dockerfile",
-            ".gitignore", ".git", "README.md"
+            ".env",
+            ".env.local",
+            ".env.production",
+            "package.json",
+            "Cargo.toml",
+            "requirements.txt",
+            "docker-compose.yml",
+            "Dockerfile",
+            ".gitignore",
+            ".git",
+            "README.md",
         ];
 
         if protected_files.contains(&file_name) {
@@ -481,20 +511,36 @@ impl FileService {
         let dangerous_chars = ['<', '>', '|', '"', '*', '?'];
         for &ch in &dangerous_chars {
             if path.contains(ch) {
-                return Err(AutomationError::InvalidPath(
-                    format!("Dangerous character '{ch}' not allowed in path"),
-                ));
+                return Err(AutomationError::InvalidPath(format!(
+                    "Dangerous character '{ch}' not allowed in path"
+                )));
             }
         }
 
         // Prevent access to sensitive system directories
         let dangerous_prefixes = [
-            "/etc/", "/proc/", "/sys/", "/dev/", "/boot/", "/var/run/",
-            "/root/", "/var/log/", "/usr/bin/", "/usr/sbin/", "/sbin/",
-            "/lib/", "/lib64/", "/usr/lib/", "/usr/lib64/",
-            "C:\\Windows\\", "C:\\Program Files\\", "C:\\Program Files (x86)\\",
-            "C:\\Users\\Administrator\\", "C:\\System Volume Information\\",
-            "C:\\$Recycle.Bin\\", "C:\\ProgramData\\Microsoft\\",
+            "/etc/",
+            "/proc/",
+            "/sys/",
+            "/dev/",
+            "/boot/",
+            "/var/run/",
+            "/root/",
+            "/var/log/",
+            "/usr/bin/",
+            "/usr/sbin/",
+            "/sbin/",
+            "/lib/",
+            "/lib64/",
+            "/usr/lib/",
+            "/usr/lib64/",
+            "C:\\Windows\\",
+            "C:\\Program Files\\",
+            "C:\\Program Files (x86)\\",
+            "C:\\Users\\Administrator\\",
+            "C:\\System Volume Information\\",
+            "C:\\$Recycle.Bin\\",
+            "C:\\ProgramData\\Microsoft\\",
         ];
 
         let normalized_path = path.to_lowercase();
@@ -512,17 +558,18 @@ impl FileService {
         {
             // Check for Windows reserved names
             let reserved_names = [
-                "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5",
-                "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4",
-                "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+                "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
+                "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8",
+                "LPT9",
             ];
-            
+
             let path_upper = path.to_uppercase();
             for reserved in &reserved_names {
                 if path_upper.contains(reserved) {
-                    return Err(AutomationError::InvalidPath(
-                        format!("Reserved Windows name '{}' not allowed in path", reserved),
-                    ));
+                    return Err(AutomationError::InvalidPath(format!(
+                        "Reserved Windows name '{}' not allowed in path",
+                        reserved
+                    )));
                 }
             }
         }
@@ -580,7 +627,10 @@ impl FileService {
 
         // Final security check: ensure the normalized path is within allowed boundaries
         if !self.is_path_allowed(&normalized)? {
-            warn!("Attempt to access file outside allowed directories: {}", normalized.display());
+            warn!(
+                "Attempt to access file outside allowed directories: {}",
+                normalized.display()
+            );
             return Err(AutomationError::InvalidPath(
                 "Access outside allowed directories not permitted".to_string(),
             ));
@@ -610,9 +660,9 @@ impl FileService {
         ];
 
         // Check if the path starts with any allowed prefix
-        let is_allowed = allowed_prefixes.iter().any(|allowed| {
-            path.starts_with(allowed)
-        });
+        let is_allowed = allowed_prefixes
+            .iter()
+            .any(|allowed| path.starts_with(allowed));
 
         // Additional check: allow paths explicitly configured via environment variable
         if !is_allowed {
@@ -628,9 +678,9 @@ impl FileService {
                     })
                     .collect();
 
-                return Ok(additional_allowed.iter().any(|allowed| {
-                    path.starts_with(allowed)
-                }));
+                return Ok(additional_allowed
+                    .iter()
+                    .any(|allowed| path.starts_with(allowed)));
             }
         }
 
@@ -649,7 +699,6 @@ pub struct FileInfo {
 
 #[cfg(test)]
 mod tests {
-    
 
     use super::*;
 
@@ -689,7 +738,11 @@ mod tests {
         // Write some text
         let test_text = "Hello, World!";
         let result = service.write_text_file(temp_path, test_text).await;
-        assert!(result.is_ok(), "Writing text file should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Writing text file should succeed: {:?}",
+            result.err()
+        );
 
         // Read the text back
         let result = service.read_text_file(temp_path).await;

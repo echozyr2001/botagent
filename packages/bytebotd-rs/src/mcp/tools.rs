@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bytebot_shared_rs::types::computer_action::{
+    Application, Button, ComputerAction, Coordinates, Press,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use crate::automation::AutomationService;
-use bytebot_shared_rs::types::computer_action::{
-    Application, Button, ComputerAction, Coordinates, Press,
-};
 
 /// MCP Tool error types
 #[derive(Debug, thiserror::Error)]
@@ -29,13 +29,13 @@ pub type McpToolResult = Result<String, McpToolError>;
 pub trait McpTool: Send + Sync {
     /// Get the tool name
     fn name(&self) -> &str;
-    
+
     /// Get the tool description
     fn description(&self) -> &str;
-    
+
     /// Get the JSON schema for input validation
     fn input_schema(&self) -> serde_json::Value;
-    
+
     /// Execute the tool with given arguments
     async fn call(&self, arguments: serde_json::Value) -> McpToolResult;
 }
@@ -63,7 +63,9 @@ pub struct CoordinatesSchema {
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ClickMouseRequest {
-    #[schemars(description = "Optional coordinates for the click. If not provided, clicks at current position")]
+    #[schemars(
+        description = "Optional coordinates for the click. If not provided, clicks at current position"
+    )]
     pub coordinates: Option<CoordinatesSchema>,
     #[schemars(description = "The mouse button to click")]
     pub button: ButtonSchema,
@@ -172,9 +174,7 @@ fn default_wait_duration() -> Option<u64> {
 
 impl ComputerUseTools {
     pub fn new(automation_service: Arc<AutomationService>) -> Self {
-        Self {
-            automation_service,
-        }
+        Self { automation_service }
     }
 
     /// Get all available MCP tools
@@ -196,7 +196,10 @@ impl ComputerUseTools {
     }
 
     /// Execute a computer automation action (legacy method for compatibility)
-    pub async fn execute_computer_action(&self, action: ComputerAction) -> Result<serde_json::Value, crate::error::AutomationError> {
+    pub async fn execute_computer_action(
+        &self,
+        action: ComputerAction,
+    ) -> Result<serde_json::Value, crate::error::AutomationError> {
         self.automation_service.execute_action(action).await
     }
 }
@@ -241,7 +244,10 @@ impl McpTool for MoveMouseTool {
         let action = ComputerAction::MoveMouse { coordinates };
 
         match self.automation_service.execute_action(action).await {
-            Ok(_) => Ok(format!("Mouse moved to ({}, {})", coordinates.x, coordinates.y)),
+            Ok(_) => Ok(format!(
+                "Mouse moved to ({}, {})",
+                coordinates.x, coordinates.y
+            )),
             Err(e) => Err(McpToolError::ExecutionError(e.to_string())),
         }
     }
@@ -299,7 +305,10 @@ impl McpTool for ClickMouseTool {
                 } else {
                     " at current position".to_string()
                 };
-                Ok(format!("Mouse clicked with {:?} button{}", button, location))
+                Ok(format!(
+                    "Mouse clicked with {:?} button{}",
+                    button, location
+                ))
             }
             Err(e) => Err(McpToolError::ExecutionError(e.to_string())),
         }
@@ -470,9 +479,15 @@ impl McpTool for ScrollTool {
         let coordinates = request.coordinates.map(|c| Coordinates { x: c.x, y: c.y });
         let direction = match request.direction {
             ScrollDirection::Up => bytebot_shared_rs::types::computer_action::ScrollDirection::Up,
-            ScrollDirection::Down => bytebot_shared_rs::types::computer_action::ScrollDirection::Down,
-            ScrollDirection::Left => bytebot_shared_rs::types::computer_action::ScrollDirection::Left,
-            ScrollDirection::Right => bytebot_shared_rs::types::computer_action::ScrollDirection::Right,
+            ScrollDirection::Down => {
+                bytebot_shared_rs::types::computer_action::ScrollDirection::Down
+            }
+            ScrollDirection::Left => {
+                bytebot_shared_rs::types::computer_action::ScrollDirection::Left
+            }
+            ScrollDirection::Right => {
+                bytebot_shared_rs::types::computer_action::ScrollDirection::Right
+            }
         };
 
         let action = ComputerAction::Scroll {
@@ -483,7 +498,10 @@ impl McpTool for ScrollTool {
         };
 
         match self.automation_service.execute_action(action).await {
-            Ok(_) => Ok(format!("Scrolled {:?} {} times", direction, request.scroll_count)),
+            Ok(_) => Ok(format!(
+                "Scrolled {:?} {} times",
+                direction, request.scroll_count
+            )),
             Err(e) => Err(McpToolError::ExecutionError(e.to_string())),
         }
     }
@@ -525,7 +543,10 @@ impl McpTool for ScreenshotTool {
         match self.automation_service.execute_action(action).await {
             Ok(result) => {
                 if let Some(image_data) = result.get("image").and_then(|v| v.as_str()) {
-                    Ok(format!("Screenshot taken successfully. Image data: {} bytes", image_data.len()))
+                    Ok(format!(
+                        "Screenshot taken successfully. Image data: {} bytes",
+                        image_data.len()
+                    ))
                 } else {
                     Ok("Screenshot taken but no image data returned".to_string())
                 }
@@ -670,7 +691,11 @@ impl McpTool for ReadFileTool {
         match self.automation_service.execute_action(action).await {
             Ok(result) => {
                 if let Some(content) = result.get("content").and_then(|v| v.as_str()) {
-                    Ok(format!("File '{}' read successfully. Content length: {} bytes", request.path, content.len()))
+                    Ok(format!(
+                        "File '{}' read successfully. Content length: {} bytes",
+                        request.path,
+                        content.len()
+                    ))
                 } else {
                     Ok(format!("File '{}' read result: {}", request.path, result))
                 }
@@ -716,7 +741,11 @@ impl McpTool for WriteFileTool {
         };
 
         match self.automation_service.execute_action(action).await {
-            Ok(_) => Ok(format!("File '{}' written successfully. Data length: {} bytes", request.path, request.data.len())),
+            Ok(_) => Ok(format!(
+                "File '{}' written successfully. Data length: {} bytes",
+                request.path,
+                request.data.len()
+            )),
             Err(e) => Err(McpToolError::ExecutionError(e.to_string())),
         }
     }
@@ -761,8 +790,7 @@ impl McpTool for WaitTool {
         }
     }
 }
-#[
-cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::automation::AutomationService;
@@ -771,11 +799,11 @@ mod tests {
     async fn test_computer_use_tools_creation() {
         let automation_service = Arc::new(AutomationService::new().unwrap());
         let tools = ComputerUseTools::new(automation_service);
-        
+
         // Test that tools can be retrieved
         let mcp_tools = tools.get_tools();
         assert_eq!(mcp_tools.len(), 12); // We have 12 different tools
-        
+
         // Verify tool names
         let tool_names: Vec<&str> = mcp_tools.iter().map(|t| t.name()).collect();
         assert!(tool_names.contains(&"move_mouse"));
@@ -807,13 +835,16 @@ mod tests {
     fn test_move_mouse_tool_schema() {
         let automation_service = Arc::new(AutomationService::new().unwrap());
         let tool = MoveMouseTool::new(automation_service);
-        
+
         assert_eq!(tool.name(), "move_mouse");
-        assert_eq!(tool.description(), "Move the mouse cursor to specific coordinates on the screen");
-        
+        assert_eq!(
+            tool.description(),
+            "Move the mouse cursor to specific coordinates on the screen"
+        );
+
         let schema = tool.input_schema();
         assert!(schema.is_object());
-        
+
         // Verify schema contains required properties
         let properties = schema.get("properties").unwrap();
         assert!(properties.get("coordinates").is_some());
@@ -823,13 +854,16 @@ mod tests {
     fn test_click_mouse_tool_schema() {
         let automation_service = Arc::new(AutomationService::new().unwrap());
         let tool = ClickMouseTool::new(automation_service);
-        
+
         assert_eq!(tool.name(), "click_mouse");
-        assert_eq!(tool.description(), "Click the mouse at specific coordinates or current position");
-        
+        assert_eq!(
+            tool.description(),
+            "Click the mouse at specific coordinates or current position"
+        );
+
         let schema = tool.input_schema();
         assert!(schema.is_object());
-        
+
         let properties = schema.get("properties").unwrap();
         assert!(properties.get("coordinates").is_some());
         assert!(properties.get("button").is_some());
@@ -840,13 +874,16 @@ mod tests {
     fn test_type_text_tool_schema() {
         let automation_service = Arc::new(AutomationService::new().unwrap());
         let tool = TypeTextTool::new(automation_service);
-        
+
         assert_eq!(tool.name(), "type_text");
-        assert_eq!(tool.description(), "Type text at the current cursor position");
-        
+        assert_eq!(
+            tool.description(),
+            "Type text at the current cursor position"
+        );
+
         let schema = tool.input_schema();
         assert!(schema.is_object());
-        
+
         let properties = schema.get("properties").unwrap();
         assert!(properties.get("text").is_some());
         assert!(properties.get("delay").is_some());
@@ -856,13 +893,16 @@ mod tests {
     fn test_application_tool_schema() {
         let automation_service = Arc::new(AutomationService::new().unwrap());
         let tool = ApplicationTool::new(automation_service);
-        
+
         assert_eq!(tool.name(), "application");
-        assert_eq!(tool.description(), "Switch to or open a specific application");
-        
+        assert_eq!(
+            tool.description(),
+            "Switch to or open a specific application"
+        );
+
         let schema = tool.input_schema();
         assert!(schema.is_object());
-        
+
         let properties = schema.get("properties").unwrap();
         assert!(properties.get("application").is_some());
     }
@@ -870,24 +910,24 @@ mod tests {
     #[test]
     fn test_file_tools_schema() {
         let automation_service = Arc::new(AutomationService::new().unwrap());
-        
+
         let read_tool = ReadFileTool::new(automation_service.clone());
         assert_eq!(read_tool.name(), "read_file");
         assert_eq!(read_tool.description(), "Read the contents of a file");
-        
+
         let write_tool = WriteFileTool::new(automation_service);
         assert_eq!(write_tool.name(), "write_file");
         assert_eq!(write_tool.description(), "Write data to a file");
-        
+
         let read_schema = read_tool.input_schema();
         let write_schema = write_tool.input_schema();
-        
+
         assert!(read_schema.is_object());
         assert!(write_schema.is_object());
-        
+
         let read_props = read_schema.get("properties").unwrap();
         let write_props = write_schema.get("properties").unwrap();
-        
+
         assert!(read_props.get("path").is_some());
         assert!(write_props.get("path").is_some());
         assert!(write_props.get("data").is_some());
@@ -961,7 +1001,8 @@ mod tests {
         // Test deserialization
         let firefox_parsed: ApplicationSchema = serde_json::from_str(&firefox_json).unwrap();
         let vscode_parsed: ApplicationSchema = serde_json::from_str(&vscode_json).unwrap();
-        let onepassword_parsed: ApplicationSchema = serde_json::from_str(&onepassword_json).unwrap();
+        let onepassword_parsed: ApplicationSchema =
+            serde_json::from_str(&onepassword_json).unwrap();
 
         assert!(matches!(firefox_parsed, ApplicationSchema::Firefox));
         assert!(matches!(vscode_parsed, ApplicationSchema::Vscode));
@@ -996,10 +1037,12 @@ mod tests {
 
     #[test]
     fn test_scroll_direction_serialization() {
-        let directions = [ScrollDirection::Up,
+        let directions = [
+            ScrollDirection::Up,
             ScrollDirection::Down,
             ScrollDirection::Left,
-            ScrollDirection::Right];
+            ScrollDirection::Right,
+        ];
 
         let expected_strings = ["up", "down", "left", "right"];
 
@@ -1086,7 +1129,7 @@ mod tests {
     #[tokio::test]
     async fn test_mock_tool_execution() {
         let automation_service = Arc::new(AutomationService::new().unwrap());
-        
+
         // Test that tools can be created and their methods called without panicking
         let move_tool = MoveMouseTool::new(automation_service.clone());
         let click_tool = ClickMouseTool::new(automation_service.clone());

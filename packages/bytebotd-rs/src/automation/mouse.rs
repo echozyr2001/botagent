@@ -161,7 +161,9 @@ impl MouseService {
         hold_keys: Option<&[String]>,
     ) -> Result<(), AutomationError> {
         if path.is_empty() {
-            return Err(AutomationError::Validation("Path cannot be empty".to_string()));
+            return Err(AutomationError::Validation(
+                "Path cannot be empty".to_string(),
+            ));
         }
 
         debug!(
@@ -181,7 +183,7 @@ impl MouseService {
         }
 
         let start = path[0];
-        
+
         // Move to start position and press button
         self.press(start, button).await?;
 
@@ -208,7 +210,9 @@ impl MouseService {
         hold_keys: Option<&[String]>,
     ) -> Result<(), AutomationError> {
         if path.is_empty() {
-            return Err(AutomationError::Validation("Path cannot be empty".to_string()));
+            return Err(AutomationError::Validation(
+                "Path cannot be empty".to_string(),
+            ));
         }
 
         debug!("Tracing mouse along path with {} points", path.len());
@@ -280,7 +284,9 @@ impl MouseService {
         hold_keys: Option<&[String]>,
     ) -> Result<(), AutomationError> {
         if scroll_count == 0 {
-            return Err(AutomationError::Validation("Scroll count must be greater than 0".to_string()));
+            return Err(AutomationError::Validation(
+                "Scroll count must be greater than 0".to_string(),
+            ));
         }
 
         let coords = coordinates.unwrap_or({
@@ -316,7 +322,7 @@ impl MouseService {
         for _ in 0..scroll_count {
             {
                 let mut enigo = self.create_enigo()?;
-                
+
                 if delta_y != 0 {
                     enigo.scroll(delta_y, enigo::Axis::Vertical).map_err(|e| {
                         error!("Failed to scroll vertically: {}", e);
@@ -325,10 +331,12 @@ impl MouseService {
                 }
 
                 if delta_x != 0 {
-                    enigo.scroll(delta_x, enigo::Axis::Horizontal).map_err(|e| {
-                        error!("Failed to scroll horizontally: {}", e);
-                        AutomationError::InputFailed(format!("Horizontal scroll failed: {e}"))
-                    })?;
+                    enigo
+                        .scroll(delta_x, enigo::Axis::Horizontal)
+                        .map_err(|e| {
+                            error!("Failed to scroll horizontally: {}", e);
+                            AutomationError::InputFailed(format!("Horizontal scroll failed: {e}"))
+                        })?;
                 }
             } // enigo is dropped here
 
@@ -383,7 +391,9 @@ impl MouseService {
         hold_keys: Option<&[String]>,
     ) -> Result<(), AutomationError> {
         if click_count == 0 {
-            return Err(AutomationError::Validation("Click count must be greater than 0".to_string()));
+            return Err(AutomationError::Validation(
+                "Click count must be greater than 0".to_string(),
+            ));
         }
 
         let coords = coordinates.unwrap_or({
@@ -413,10 +423,12 @@ impl MouseService {
         for i in 0..click_count {
             {
                 let mut enigo = self.create_enigo()?;
-                enigo.button(enigo_button, enigo::Direction::Click).map_err(|e| {
-                    error!("Failed to click mouse: {}", e);
-                    AutomationError::InputFailed(format!("Mouse click failed: {e}"))
-                })?;
+                enigo
+                    .button(enigo_button, enigo::Direction::Click)
+                    .map_err(|e| {
+                        error!("Failed to click mouse: {}", e);
+                        AutomationError::InputFailed(format!("Mouse click failed: {e}"))
+                    })?;
             } // enigo is dropped here
 
             // Small delay between multiple clicks
@@ -546,21 +558,25 @@ mod tests {
         let service = MouseService::new().expect("Failed to create mouse service");
 
         // Test zero scroll count
-        let result = service.scroll_direction(
-            Some(Coordinates { x: 100, y: 100 }),
-            ScrollDirection::Up,
-            0,
-            None,
-        ).await;
+        let result = service
+            .scroll_direction(
+                Some(Coordinates { x: 100, y: 100 }),
+                ScrollDirection::Up,
+                0,
+                None,
+            )
+            .await;
         assert!(result.is_err());
 
         // Test invalid coordinates
-        let result = service.scroll_direction(
-            Some(Coordinates { x: -1, y: 100 }),
-            ScrollDirection::Up,
-            1,
-            None,
-        ).await;
+        let result = service
+            .scroll_direction(
+                Some(Coordinates { x: -1, y: 100 }),
+                ScrollDirection::Up,
+                1,
+                None,
+            )
+            .await;
         assert!(result.is_err());
     }
 
@@ -569,21 +585,15 @@ mod tests {
         let service = MouseService::new().expect("Failed to create mouse service");
 
         // Test zero click count
-        let result = service.click_with_options(
-            Some(Coordinates { x: 100, y: 100 }),
-            Button::Left,
-            0,
-            None,
-        ).await;
+        let result = service
+            .click_with_options(Some(Coordinates { x: 100, y: 100 }), Button::Left, 0, None)
+            .await;
         assert!(result.is_err());
 
         // Test invalid coordinates
-        let result = service.click_with_options(
-            Some(Coordinates { x: -1, y: 100 }),
-            Button::Left,
-            1,
-            None,
-        ).await;
+        let result = service
+            .click_with_options(Some(Coordinates { x: -1, y: 100 }), Button::Left, 1, None)
+            .await;
         assert!(result.is_err());
     }
 }
