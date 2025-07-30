@@ -38,9 +38,16 @@ async-trait = { workspace = true }
 # Shared types
 bytebot-shared-rs = { path = "../bytebot-shared-rs" }
 
+# MCP (Model Context Protocol)
+rmcp = { version = "0.1", features = ["transport-io", "macros"] }
+schemars = { version = "0.8", features = ["derive"] }
+
 # Configuration
 envy = "0.4"
 dotenvy = "0.15"
+
+# Directory utilities
+dirs = "5.0"
 
 # Platform-specific dependencies
 [target.'cfg(unix)'.dependencies]

@@ -28,7 +28,7 @@ impl KeyboardService {
         debug!("Typing text: {}", text);
 
         if text.is_empty() {
-            return Ok(());
+            return Err(AutomationError::Validation("Text cannot be empty".to_string()));
         }
 
         let mut enigo = self.create_enigo()?;
@@ -50,11 +50,24 @@ impl KeyboardService {
         debug!("Typing text with {}ms delay: {}", delay_ms, text);
 
         if text.is_empty() {
-            return Ok(());
+            return Err(AutomationError::Validation("Text cannot be empty".to_string()));
+        }
+
+        // Validate delay
+        if delay_ms > 60000 {
+            return Err(AutomationError::Validation("Delay cannot exceed 60 seconds".to_string()));
         }
 
         for ch in text.chars() {
-            self.type_text(&ch.to_string()).await?;
+            // Type each character individually
+            {
+                let mut enigo = self.create_enigo()?;
+                enigo.text(&ch.to_string()).map_err(|e| {
+                    error!("Failed to type character '{}': {}", ch, e);
+                    AutomationError::InputFailed(format!("Character input failed for '{ch}': {e}"))
+                })?;
+            } // enigo is dropped here
+
             if delay_ms > 0 {
                 tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
             }
@@ -68,7 +81,16 @@ impl KeyboardService {
         debug!("Pressing keys: {:?}", keys);
 
         if keys.is_empty() {
-            return Ok(());
+            return Err(AutomationError::Validation("Keys array cannot be empty".to_string()));
+        }
+
+        // Validate all keys first
+        for key in keys {
+            if key.is_empty() {
+                return Err(AutomationError::Validation("Key cannot be empty".to_string()));
+            }
+            // Validate that the key can be converted
+            self.convert_key(key)?;
         }
 
         for key in keys {
@@ -83,6 +105,50 @@ impl KeyboardService {
 
             // Small delay between key presses
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+
+        Ok(())
+    }
+
+    /// Press keys with delay between each key
+    pub async fn press_keys_with_delay(
+        &self,
+        keys: &[String],
+        delay_ms: u64,
+    ) -> Result<(), AutomationError> {
+        debug!("Pressing keys with {}ms delay: {:?}", delay_ms, keys);
+
+        if keys.is_empty() {
+            return Err(AutomationError::Validation("Keys array cannot be empty".to_string()));
+        }
+
+        // Validate delay
+        if delay_ms > 60000 {
+            return Err(AutomationError::Validation("Delay cannot exceed 60 seconds".to_string()));
+        }
+
+        // Validate all keys first
+        for key in keys {
+            if key.is_empty() {
+                return Err(AutomationError::Validation("Key cannot be empty".to_string()));
+            }
+            self.convert_key(key)?;
+        }
+
+        for key in keys {
+            {
+                let mut enigo = self.create_enigo()?;
+                let enigo_key = self.convert_key(key)?;
+                enigo.key(enigo_key, enigo::Direction::Click).map_err(|e| {
+                    error!("Failed to press key '{}': {}", key, e);
+                    AutomationError::InputFailed(format!("Key press failed for '{key}': {e}"))
+                })?;
+            }
+
+            // Apply specified delay
+            if delay_ms > 0 {
+                tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+            }
         }
 
         Ok(())
@@ -154,6 +220,18 @@ impl KeyboardService {
         debug!("Pasting from clipboard");
         self.press_key_combination(&["ctrl".to_string(), "v".to_string()])
             .await
+    }
+
+    /// Paste specific text (simulates typing the text directly)
+    pub async fn paste_text(&self, text: &str) -> Result<(), AutomationError> {
+        debug!("Pasting text directly: {}", text);
+        
+        if text.is_empty() {
+            return Err(AutomationError::Validation("Text cannot be empty".to_string()));
+        }
+
+        // For paste_text, we directly type the text instead of using clipboard
+        self.type_text(text).await
     }
 
     /// Copy to clipboard
@@ -266,13 +344,75 @@ mod tests {
     async fn test_empty_text_input() {
         let service = KeyboardService::new().expect("Failed to create keyboard service");
         let result = service.type_text("").await;
-        assert!(result.is_ok(), "Empty text input should succeed");
+        assert!(result.is_err(), "Empty text input should fail with validation error");
     }
 
     #[tokio::test]
     async fn test_empty_keys_input() {
         let service = KeyboardService::new().expect("Failed to create keyboard service");
         let result = service.press_keys(&[]).await;
-        assert!(result.is_ok(), "Empty keys input should succeed");
+        assert!(result.is_err(), "Empty keys input should fail with validation error");
+    }
+
+    #[tokio::test]
+    async fn test_empty_text_validation() {
+        let service = KeyboardService::new().expect("Failed to create keyboard service");
+        
+        // Test empty text for type_text
+        let result = service.type_text("").await;
+        assert!(result.is_err(), "Empty text should fail validation");
+
+        // Test empty text for paste_text
+        let result = service.paste_text("").await;
+        assert!(result.is_err(), "Empty text should fail validation");
+
+        // Test empty text for type_text_with_delay
+        let result = service.type_text_with_delay("", 100).await;
+        assert!(result.is_err(), "Empty text should fail validation");
+    }
+
+    #[tokio::test]
+    async fn test_invalid_delay_validation() {
+        let service = KeyboardService::new().expect("Failed to create keyboard service");
+        
+        // Test excessive delay for type_text_with_delay
+        let result = service.type_text_with_delay("test", 70000).await;
+        assert!(result.is_err(), "Excessive delay should fail validation");
+
+        // Test excessive delay for press_keys_with_delay
+        let result = service.press_keys_with_delay(&["a".to_string()], 70000).await;
+        assert!(result.is_err(), "Excessive delay should fail validation");
+    }
+
+    #[tokio::test]
+    async fn test_invalid_keys_validation() {
+        let service = KeyboardService::new().expect("Failed to create keyboard service");
+        
+        // Test empty key in array
+        let result = service.press_keys(&["a".to_string(), "".to_string()]).await;
+        assert!(result.is_err(), "Empty key should fail validation");
+
+        // Test unknown key
+        let result = service.press_keys(&["unknown_key_12345".to_string()]).await;
+        assert!(result.is_err(), "Unknown key should fail validation");
+    }
+
+    #[tokio::test]
+    async fn test_press_keys_with_delay_validation() {
+        let service = KeyboardService::new().expect("Failed to create keyboard service");
+        
+        // Test empty keys array
+        let result = service.press_keys_with_delay(&[], 100).await;
+        assert!(result.is_err(), "Empty keys array should fail validation");
+
+        // Test valid input (should not fail validation, but might fail execution in headless environment)
+        let result = service.press_keys_with_delay(&["a".to_string()], 10).await;
+        // We don't assert success here as it might fail in headless CI environment
+        // but it should not fail due to validation
+        if result.is_err() {
+            // If it fails, it should not be due to validation
+            let error_msg = result.unwrap_err().to_string();
+            assert!(!error_msg.contains("validation"), "Should not fail due to validation: {error_msg}");
+        }
     }
 }

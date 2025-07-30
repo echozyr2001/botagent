@@ -1,6 +1,7 @@
 mod automation;
 mod config;
 mod error;
+mod mcp;
 mod routes;
 
 use std::sync::Arc;

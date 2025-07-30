@@ -1,6 +1,7 @@
 use std::io::Cursor;
 
 use base64::{engine::general_purpose, Engine as _};
+use bytebot_shared_rs::types::computer_action::Coordinates;
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use screenshots::Screen;
 use tracing::{debug, error, info};
@@ -96,6 +97,56 @@ impl ScreenService {
                 x: screen.display_info.x,
                 y: screen.display_info.y,
                 is_primary: screen.display_info.is_primary,
+            })
+            .collect()
+    }
+
+    /// Validate screen coordinates against available screens
+    pub fn validate_coordinates(&self, coordinates: &Coordinates) -> Result<(), AutomationError> {
+        if coordinates.x < 0 || coordinates.y < 0 {
+            return Err(AutomationError::InvalidCoordinates {
+                x: coordinates.x,
+                y: coordinates.y,
+            });
+        }
+
+        // Check if coordinates are within any screen bounds
+        let within_bounds = self.screens.iter().any(|screen| {
+            let display = &screen.display_info;
+            coordinates.x >= display.x
+                && coordinates.x < display.x + display.width as i32
+                && coordinates.y >= display.y
+                && coordinates.y < display.y + display.height as i32
+        });
+
+        if !within_bounds {
+            return Err(AutomationError::InvalidCoordinates {
+                x: coordinates.x,
+                y: coordinates.y,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Get the primary screen dimensions for coordinate validation
+    pub fn get_primary_screen_bounds(&self) -> Option<(i32, i32, u32, u32)> {
+        self.screens
+            .iter()
+            .find(|screen| screen.display_info.is_primary)
+            .map(|screen| {
+                let display = &screen.display_info;
+                (display.x, display.y, display.width, display.height)
+            })
+    }
+
+    /// Get all screen bounds for coordinate validation
+    pub fn get_all_screen_bounds(&self) -> Vec<(i32, i32, u32, u32)> {
+        self.screens
+            .iter()
+            .map(|screen| {
+                let display = &screen.display_info;
+                (display.x, display.y, display.width, display.height)
             })
             .collect()
     }
@@ -199,5 +250,48 @@ mod tests {
                 // We don't fail the test, just log the expected failure
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_coordinate_validation() {
+        let service = ScreenService::new().expect("Failed to create screen service");
+
+        // Test negative coordinates
+        let invalid_coords = Coordinates { x: -1, y: 100 };
+        assert!(service.validate_coordinates(&invalid_coords).is_err());
+
+        let invalid_coords2 = Coordinates { x: 100, y: -1 };
+        assert!(service.validate_coordinates(&invalid_coords2).is_err());
+
+        // Test coordinates within screen bounds (assuming we have at least one screen)
+        if let Some((x, y, width, height)) = service.get_primary_screen_bounds() {
+            let valid_coords = Coordinates {
+                x: x + 100,
+                y: y + 100,
+            };
+            // Only test if coordinates are within bounds
+            if valid_coords.x < x + width as i32 && valid_coords.y < y + height as i32 {
+                assert!(service.validate_coordinates(&valid_coords).is_ok());
+            }
+
+            // Test coordinates outside screen bounds
+            let out_of_bounds = Coordinates {
+                x: x + width as i32 + 1000,
+                y: y + height as i32 + 1000,
+            };
+            assert!(service.validate_coordinates(&out_of_bounds).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_screen_bounds() {
+        let service = ScreenService::new().expect("Failed to create screen service");
+
+        let primary_bounds = service.get_primary_screen_bounds();
+        assert!(primary_bounds.is_some(), "Should have a primary screen");
+
+        let all_bounds = service.get_all_screen_bounds();
+        assert!(!all_bounds.is_empty(), "Should have at least one screen");
+        assert_eq!(all_bounds.len(), service.screens.len());
     }
 }
