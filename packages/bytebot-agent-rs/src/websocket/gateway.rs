@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use bytebot_shared_rs::types::{Message, Task};
+use bytebot_shared_rs::{
+    logging::websocket_logging,
+    types::{Message, Task},
+};
 use serde_json::Value;
 use socketioxide::{
     extract::{Data, SocketRef},
@@ -58,6 +61,7 @@ impl WebSocketGateway {
 
             // Handle connection
             let socket_id = socket.id.to_string();
+            websocket_logging::client_connected(&socket_id);
             let conn_mgr = connection_manager.clone();
             tokio::spawn(async move {
                 conn_mgr.handle_connection(socket_id).await;
@@ -69,8 +73,10 @@ impl WebSocketGateway {
                 move |socket: SocketRef| {
                     let connection_manager = connection_manager.clone();
                     async move {
+                        let socket_id = socket.id.to_string();
+                        websocket_logging::client_disconnected(&socket_id);
                         connection_manager
-                            .handle_disconnection(socket.id.to_string())
+                            .handle_disconnection(socket_id)
                             .await;
                     }
                 }
@@ -84,19 +90,19 @@ impl WebSocketGateway {
                     async move {
                         match Self::handle_join_task(&connection_manager, &socket, data).await {
                             Ok(task_id) => {
-                                debug!("Client {} successfully joined task {}", socket.id, task_id);
+                                websocket_logging::client_joined_task(&socket.id.to_string(), &task_id);
                                 let response = ServerMessage::TaskJoined { task_id };
                                 if let Err(e) = socket.emit("task_joined", response) {
-                                    error!("Failed to emit task_joined: {}", e);
+                                    error!(error = %e, "Failed to emit task_joined");
                                 }
                             }
                             Err(e) => {
-                                warn!("Failed to join task: {}", e);
+                                warn!(error = %e, "Failed to join task");
                                 let response = ServerMessage::Error {
                                     message: format!("Failed to join task: {e}"),
                                 };
                                 if let Err(e) = socket.emit("error", response) {
-                                    error!("Failed to emit error: {}", e);
+                                    error!(error = %e, "Failed to emit error");
                                 }
                             }
                         }
@@ -112,19 +118,19 @@ impl WebSocketGateway {
                     async move {
                         match Self::handle_leave_task(&connection_manager, &socket, data).await {
                             Ok(task_id) => {
-                                debug!("Client {} successfully left task {}", socket.id, task_id);
+                                websocket_logging::client_left_task(&socket.id.to_string(), &task_id);
                                 let response = ServerMessage::TaskLeft { task_id };
                                 if let Err(e) = socket.emit("task_left", response) {
-                                    error!("Failed to emit task_left: {}", e);
+                                    error!(error = %e, "Failed to emit task_left");
                                 }
                             }
                             Err(e) => {
-                                warn!("Failed to leave task: {}", e);
+                                warn!(error = %e, "Failed to leave task");
                                 let response = ServerMessage::Error {
                                     message: format!("Failed to leave task: {e}"),
                                 };
                                 if let Err(e) = socket.emit("error", response) {
-                                    error!("Failed to emit error: {}", e);
+                                    error!(error = %e, "Failed to emit error");
                                 }
                             }
                         }
@@ -162,7 +168,7 @@ impl WebSocketGateway {
             .await
             .map_err(|e| ServiceError::Internal(format!("Failed to join task room: {e}")))?;
 
-        info!("Client {} joined task {}", socket.id, task_id);
+        // Logging is handled by the caller
         Ok(task_id)
     }
 
@@ -194,7 +200,7 @@ impl WebSocketGateway {
             .await
             .map_err(|e| ServiceError::Internal(format!("Failed to leave task room: {e}")))?;
 
-        info!("Client {} left task {}", socket.id, task_id);
+        // Logging is handled by the caller
         Ok(task_id)
     }
 
@@ -204,10 +210,15 @@ impl WebSocketGateway {
         let room_name = format!("task_{task_id}");
         let message = ServerMessage::TaskUpdated { task: task.clone() };
 
+        let client_count = self.connection_manager.get_room_client_count(&room_name).await;
         if let Err(e) = self.io.to(room_name.clone()).emit("task_updated", message) {
-            error!("Failed to emit task_updated to room {}: {}", room_name, e);
+            error!(
+                room = %room_name,
+                error = %e,
+                "Failed to emit task_updated"
+            );
         } else {
-            debug!("Emitted task_updated to room {}", room_name);
+            websocket_logging::event_emitted("task_updated", Some(&room_name), client_count);
         }
     }
 
@@ -219,14 +230,19 @@ impl WebSocketGateway {
             message: message.clone(),
         };
 
+        let client_count = self.connection_manager.get_room_client_count(&room_name).await;
         if let Err(e) = self
             .io
             .to(room_name.clone())
             .emit("new_message", server_message)
         {
-            error!("Failed to emit new_message to room {}: {}", room_name, e);
+            error!(
+                room = %room_name,
+                error = %e,
+                "Failed to emit new_message"
+            );
         } else {
-            debug!("Emitted new_message to room {}", room_name);
+            websocket_logging::event_emitted("new_message", Some(&room_name), client_count);
         }
     }
 
@@ -235,10 +251,11 @@ impl WebSocketGateway {
     pub async fn emit_task_created(&self, task: &Task) {
         let message = ServerMessage::TaskCreated { task: task.clone() };
 
+        let client_count = self.connection_manager.get_total_clients().await;
         if let Err(e) = self.io.emit("task_created", message) {
-            error!("Failed to emit task_created globally: {}", e);
+            error!(error = %e, "Failed to emit task_created globally");
         } else {
-            debug!("Emitted task_created globally");
+            websocket_logging::event_emitted("task_created", None, client_count);
         }
     }
 
@@ -249,10 +266,11 @@ impl WebSocketGateway {
             task_id: task_id.to_string(),
         };
 
+        let client_count = self.connection_manager.get_total_clients().await;
         if let Err(e) = self.io.emit("task_deleted", message) {
-            error!("Failed to emit task_deleted globally: {}", e);
+            error!(error = %e, "Failed to emit task_deleted globally");
         } else {
-            debug!("Emitted task_deleted globally for task {}", task_id);
+            websocket_logging::event_emitted("task_deleted", None, client_count);
         }
     }
 
@@ -271,23 +289,31 @@ impl WebSocketGateway {
         let room_name = format!("task_{task_id}");
         let event_name = event_name.to_string();
 
+        let client_count = self.connection_manager.get_room_client_count(&room_name).await;
         if let Err(e) = self.io.to(room_name.clone()).emit(event_name.clone(), data) {
             error!(
-                "Failed to broadcast {} to room {}: {}",
-                event_name, room_name, e
+                event_type = %event_name,
+                room = %room_name,
+                error = %e,
+                "Failed to broadcast event"
             );
         } else {
-            debug!("Broadcasted {} to room {}", event_name, room_name);
+            websocket_logging::event_emitted(&event_name, Some(&room_name), client_count);
         }
     }
 
     /// Broadcast a generic event to all connected clients
     pub async fn broadcast_global(&self, event_name: &str, data: impl serde::Serialize) {
         let event_name = event_name.to_string();
+        let client_count = self.connection_manager.get_total_clients().await;
         if let Err(e) = self.io.emit(event_name.clone(), data) {
-            error!("Failed to broadcast {} globally: {}", event_name, e);
+            error!(
+                event_type = %event_name,
+                error = %e,
+                "Failed to broadcast event globally"
+            );
         } else {
-            debug!("Broadcasted {} globally", event_name);
+            websocket_logging::event_emitted(&event_name, None, client_count);
         }
     }
 }

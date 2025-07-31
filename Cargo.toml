@@ -50,7 +50,11 @@ base64 = "0.21"
 thiserror = "1.0"
 anyhow = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "json",
+    "time",
+] }
 async-trait = "0.1"
 validator = { version = "0.16", features = ["derive"] }
 

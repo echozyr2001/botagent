@@ -23,6 +23,10 @@ chrono = { workspace = true }
 base64 = { workspace = true }
 thiserror = { workspace = true }
 
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["json", "time", "env-filter"] }
+
 # Validation
 validator = { version = "0.16", features = ["derive"] }
 regex = "1.10"
@@ -35,6 +39,7 @@ jsonwebtoken = { version = "9.2" }
 [dev-dependencies]
 tokio-test = { workspace = true }
 criterion = { workspace = true }
+fastrand = "2.0"
 
 [[bench]]
 name = "shared_benchmarks"

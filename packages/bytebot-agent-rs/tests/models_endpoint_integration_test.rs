@@ -5,8 +5,13 @@ use axum::{
     http::{Method, Request, StatusCode},
 };
 use bytebot_agent_rs::{
-    ai::UnifiedAIService, config::Config, database::DatabaseManager, routes::create_task_routes,
+    ai::UnifiedAIService,
+    auth::{AuthService, AuthServiceTrait},
+    config::Config,
+    database::DatabaseManager,
+    routes::create_task_routes,
     server::AppState,
+    websocket::WebSocketGateway,
 };
 use serde_json::Value;
 use tower::ServiceExt;
@@ -35,11 +40,20 @@ async fn test_models_endpoint_integration() {
     // Create AI service
     let ai_service = UnifiedAIService::new(&config);
 
-    // Create app state
+    // Create app state with all required fields
+    let auth_service: Arc<dyn AuthServiceTrait> = Arc::new(AuthService::new(
+        db_manager.get_pool(),
+        config.jwt_secret.clone(),
+        config.auth_enabled,
+    ));
+    let websocket_gateway = Arc::new(WebSocketGateway::new());
+
     let state = AppState {
         config: Arc::new(config),
         db: Arc::new(db_manager),
         ai_service: Arc::new(ai_service),
+        auth_service,
+        websocket_gateway,
     };
 
     // Create the router
@@ -136,11 +150,20 @@ async fn test_models_endpoint_no_keys() {
     // Create AI service
     let ai_service = UnifiedAIService::new(&config);
 
-    // Create app state
+    // Create app state with all required fields
+    let auth_service: Arc<dyn AuthServiceTrait> = Arc::new(AuthService::new(
+        db_manager.get_pool(),
+        config.jwt_secret.clone(),
+        config.auth_enabled,
+    ));
+    let websocket_gateway = Arc::new(WebSocketGateway::new());
+
     let state = AppState {
         config: Arc::new(config),
         db: Arc::new(db_manager),
         ai_service: Arc::new(ai_service),
+        auth_service,
+        websocket_gateway,
     };
 
     // Create the router

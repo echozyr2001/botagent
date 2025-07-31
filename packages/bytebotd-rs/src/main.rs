@@ -11,35 +11,39 @@ use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     HeaderValue, Method,
 };
+use bytebot_shared_rs::logging::{init_logging, LoggingConfig};
 use tower_http::cors::CorsLayer;
-use tracing::{error, info, Level};
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load environment variables
     dotenvy::dotenv().ok();
 
-    // Initialize tracing
-    let log_level = std::env::var("LOG_LEVEL")
-        .unwrap_or_else(|_| "info".to_string())
-        .parse::<Level>()
-        .unwrap_or(Level::INFO);
+    // Initialize structured logging
+    let logging_config = LoggingConfig::for_service("bytebotd-rs");
+    init_logging(logging_config).map_err(|e| {
+        eprintln!("Failed to initialize logging: {}", e);
+        anyhow::anyhow!("Logging initialization failed: {}", e)
+    })?;
 
-    tracing_subscriber::fmt().with_max_level(log_level).init();
-
-    info!("Starting ByteBot Desktop Automation Daemon Rust service...");
+    info!(
+        service = "bytebotd-rs",
+        version = env!("CARGO_PKG_VERSION"),
+        "Starting ByteBot Desktop Automation Daemon Rust service"
+    );
 
     // Load configuration
     let config = config::Config::from_env().map_err(|e| {
-        error!("Failed to load configuration: {}", e);
+        error!(error = %e, "Failed to load configuration");
         e
     })?;
 
-    info!("Configuration loaded: {:?}", config);
+    info!(config = ?config, "Configuration loaded successfully");
 
     // Initialize automation service
     let automation_service = Arc::new(automation::AutomationService::new().map_err(|e| {
-        error!("Failed to initialize automation service: {}", e);
+        error!(error = %e, "Failed to initialize automation service");
         anyhow::anyhow!("Automation service initialization failed: {}", e)
     })?);
 
@@ -66,25 +70,38 @@ async fn main() -> Result<()> {
 
     // Get socket address
     let addr = config.socket_addr();
-    info!("Starting server on {}", addr);
+    info!(bind_address = %addr, "Starting server");
 
     // Start the server
     let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
-        error!("Failed to bind to address {}: {}", addr, e);
+        error!(
+            bind_address = %addr,
+            error = %e,
+            "Failed to bind to address"
+        );
         anyhow::anyhow!("Failed to bind to address: {}", e)
     })?;
 
-    info!("ByteBot Desktop Automation Daemon is running on {}", addr);
-    info!("Health check available at: http://{}/health", addr);
     info!(
-        "Computer-use API available at: http://{}/computer-use",
-        addr
+        bind_address = %addr,
+        service = "bytebotd-rs",
+        version = env!("CARGO_PKG_VERSION"),
+        "Desktop Automation Daemon is running"
+    );
+    info!(
+        health_endpoint = format!("http://{}/health", addr),
+        "Health check endpoint available"
+    );
+    info!(
+        computer_use_endpoint = format!("http://{}/computer-use", addr),
+        "Computer-use API endpoint available"
     );
 
     axum::serve(listener, app).await.map_err(|e| {
-        error!("Server error: {}", e);
+        error!(error = %e, "Server error occurred");
         anyhow::anyhow!("Server error: {}", e)
     })?;
 
+    info!(service = "bytebotd-rs", "Service shutdown complete");
     Ok(())
 }

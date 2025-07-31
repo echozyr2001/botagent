@@ -127,6 +127,18 @@ impl ConnectionManager {
         connections.keys().cloned().collect()
     }
 
+    /// Get the number of clients in a specific room
+    pub async fn get_room_client_count(&self, room_name: &str) -> usize {
+        let rooms = self.rooms.read().await;
+        rooms.get(room_name).map(|v| v.len()).unwrap_or(0)
+    }
+
+    /// Get the total number of connected clients
+    pub async fn get_total_clients(&self) -> usize {
+        let connections = self.connections.read().await;
+        connections.len()
+    }
+
     /// Get connection statistics for monitoring
     pub async fn get_stats(&self) -> ConnectionStats {
         let connections = self.connections.read().await;

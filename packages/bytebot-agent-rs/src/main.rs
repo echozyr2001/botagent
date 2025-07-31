@@ -10,37 +10,39 @@ mod websocket;
 use std::sync::Arc;
 
 use anyhow::Result;
+use bytebot_shared_rs::logging::{init_logging, LoggingConfig};
 use config::Config;
 use database::MigrationRunner;
 use server::{create_app, create_app_state};
 use tokio::net::TcpListener;
-use tracing::{error, info, Level};
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing with environment-based log level
-    let log_level = std::env::var("LOG_LEVEL")
-        .unwrap_or_else(|_| "info".to_string())
-        .parse::<Level>()
-        .unwrap_or(Level::INFO);
+    // Initialize structured logging
+    let logging_config = LoggingConfig::for_service("bytebot-agent-rs");
+    init_logging(logging_config).map_err(|e| {
+        eprintln!("Failed to initialize logging: {}", e);
+        anyhow::anyhow!("Logging initialization failed: {}", e)
+    })?;
 
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .with_target(false)
-        .init();
-
-    info!("Starting ByteBot Agent Rust service...");
+    info!(
+        service = "bytebot-agent-rs",
+        version = env!("CARGO_PKG_VERSION"),
+        "Starting ByteBot Agent Rust service"
+    );
 
     // Load configuration
     let config = Config::from_env().map_err(|e| {
-        error!("Failed to load configuration: {}", e);
+        error!(error = %e, "Failed to load configuration");
         e
     })?;
 
     info!("Configuration loaded successfully");
     info!(
-        "Server will bind to {}:{}",
-        config.server.host, config.server.port
+        host = %config.server.host,
+        port = config.server.port,
+        "Server will bind to address"
     );
 
     // Create database if it doesn't exist
@@ -53,42 +55,42 @@ async fn main() -> Result<()> {
         .await
         .map_err(|e| {
             error!(
-                "Failed to create temporary database connection for migrations: {}",
-                e
+                error = %e,
+                "Failed to create temporary database connection for migrations"
             );
             e
         })?;
 
     let migration_runner = MigrationRunner::new(temp_pool.clone());
     migration_runner.run_migrations().await.map_err(|e| {
-        error!("Failed to run migrations: {}", e);
+        error!(error = %e, "Failed to run migrations");
         e
     })?;
 
-    info!("Database migrations completed");
+    info!("Database migrations completed successfully");
     temp_pool.close().await;
 
     // Create application state with all services
     let config_arc = Arc::new(config.clone());
     let app_state = create_app_state(config_arc).await.map_err(|e| {
-        error!("Failed to create application state: {}", e);
+        error!(error = %e, "Failed to create application state");
         anyhow::anyhow!("Failed to create application state: {}", e)
     })?;
 
     info!("Application state initialized successfully");
 
     // Log authentication status
-    if app_state.config.auth_enabled {
-        info!("Authentication is ENABLED");
-    } else {
-        info!("Authentication is DISABLED");
-    }
+    info!(
+        auth_enabled = app_state.config.auth_enabled,
+        "Authentication configuration"
+    );
 
     // Log pool statistics
     let stats = app_state.db.pool_stats();
     info!(
-        "Database pool stats - Size: {}, Idle: {}",
-        stats.size, stats.idle
+        pool_size = stats.size,
+        idle_connections = stats.idle,
+        "Database connection pool initialized"
     );
 
     // Create Axum application with middleware
@@ -97,22 +99,31 @@ async fn main() -> Result<()> {
     // Create TCP listener
     let bind_address = format!("{}:{}", config.server.host, config.server.port);
     let listener = TcpListener::bind(&bind_address).await.map_err(|e| {
-        error!("Failed to bind to {}: {}", bind_address, e);
+        error!(
+            bind_address = %bind_address,
+            error = %e,
+            "Failed to bind to address"
+        );
         anyhow::anyhow!("Failed to bind to address: {}", e)
     })?;
 
     info!(
-        "ByteBot Agent Rust service started successfully on {}",
-        bind_address
-    );
-    info!("Health check available at: http://{}/health", bind_address);
-    info!(
-        "WebSocket endpoint available at: ws://{}/socket.io/",
-        bind_address
+        bind_address = %bind_address,
+        service = "bytebot-agent-rs",
+        version = env!("CARGO_PKG_VERSION"),
+        "Service started successfully"
     );
     info!(
-        "WebSocket stats available at: http://{}/ws-stats",
-        bind_address
+        health_endpoint = format!("http://{}/health", bind_address),
+        "Health check endpoint available"
+    );
+    info!(
+        websocket_endpoint = format!("ws://{}/socket.io/", bind_address),
+        "WebSocket endpoint available"
+    );
+    info!(
+        stats_endpoint = format!("http://{}/ws-stats", bind_address),
+        "WebSocket stats endpoint available"
     );
 
     // Start the server
@@ -120,11 +131,11 @@ async fn main() -> Result<()> {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .map_err(|e| {
-            error!("Server error: {}", e);
+            error!(error = %e, "Server error occurred");
             anyhow::anyhow!("Server error: {}", e)
         })?;
 
-    info!("Service shutdown complete");
+    info!(service = "bytebot-agent-rs", "Service shutdown complete");
     Ok(())
 }
 
@@ -149,10 +160,10 @@ async fn shutdown_signal() {
 
     tokio::select! {
         _ = ctrl_c => {
-            info!("Received Ctrl+C, shutting down gracefully...");
+            info!(signal = "SIGINT", "Received shutdown signal, shutting down gracefully");
         },
         _ = terminate => {
-            info!("Received SIGTERM, shutting down gracefully...");
+            info!(signal = "SIGTERM", "Received shutdown signal, shutting down gracefully");
         },
     }
 }

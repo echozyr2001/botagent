@@ -1,92 +1,69 @@
 # ByteBot Agent Rust Service
 
-This is the Rust implementation of the ByteBot AI agent service, designed to replace the existing TypeScript/Node.js version while maintaining full API compatibility.
+This is the Rust implementation of the ByteBot AI agent service, providing high-performance task management, AI model integration, and WebSocket communication.
 
-## Features Implemented
+## Docker Configuration
 
-### Task 5.1: Axum Web Server with Middleware ✅
-
-The following components have been implemented:
-
-#### 1. Main Application Setup
-- **Axum Router**: Modern async web framework with proper routing
-- **Graceful Shutdown**: Handles SIGTERM and CTRL+C signals properly
-- **Configuration Management**: Environment-based configuration with `.env` support
-- **Structured Logging**: Tracing-based logging with configurable levels
-
-#### 2. Middleware Stack
-- **CORS Middleware**: Configured to match existing TypeScript service (`origin: '*'`)
-- **Request Tracing**: HTTP request/response logging with structured output
-- **Error Handling**: Centralized error handling with proper HTTP status codes
-
-#### 3. Health Check Endpoints
-- **`/health`**: Basic health check endpoint
-- **`/api/health`**: Health check with API prefix (matches existing pattern)
-- **Database Health**: Includes database connectivity status in health response
-- **Service Information**: Returns service version, timestamp, and pool statistics
-
-#### 4. Application State Management
-- **Shared State**: `AppState` struct containing configuration and database manager
-- **Arc-wrapped**: Thread-safe shared state across handlers
-- **Database Integration**: Integrated with existing database layer
-
-## Configuration
-
-The service uses environment variables for configuration:
+### Building the Image
 
 ```bash
-DATABASE_URL=postgresql://postgres:postgres@postgres:5432/bytebotdb
-HOST=0.0.0.0
-PORT=9991
-LOG_LEVEL=info
-CORS_ORIGINS=http://localhost:3000,http://localhost:9992
+# From the project root
+docker build -t bytebot-agent-rs -f packages/bytebot-agent-rs/Dockerfile .
 ```
 
-## API Compatibility
+### Running the Container
 
-The server maintains compatibility with the existing TypeScript service:
-
-- **Port**: Default 9991 (same as TypeScript version)
-- **CORS**: Allows all origins with same methods (`GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`)
-- **Health Endpoints**: Same response format and structure
-- **Error Handling**: JSON error responses with proper HTTP status codes
-
-## Health Check Response Format
-
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-01-27T12:00:00Z",
-  "version": "0.1.0",
-  "service": "bytebot-agent-rs",
-  "database": {
-    "connected": true,
-    "pool_stats": {
-      "size": 10,
-      "idle": 8
-    }
-  }
-}
-```
-
-## Testing
-
-Run unit tests (excluding database integration tests):
 ```bash
-cargo test --lib -- --skip database::tests --skip server::tests
+docker run -d \
+  --name bytebot-agent-rs \
+  -p 9991:9991 \
+  -e DATABASE_URL="postgresql://postgres:postgres@localhost:5432/bytebotdb" \
+  -e ANTHROPIC_API_KEY="your-anthropic-key" \
+  -e OPENAI_API_KEY="your-openai-key" \
+  -e GOOGLE_API_KEY="your-google-key" \
+  bytebot-agent-rs
 ```
 
-Build the service:
-```bash
-cargo build
-```
+### Environment Variables
 
-## Next Steps
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | Yes | - |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API key | No | - |
+| `OPENAI_API_KEY` | OpenAI GPT API key | No | - |
+| `GOOGLE_API_KEY` | Google Gemini API key | No | - |
+| `RUST_LOG` | Log level configuration | No | `info` |
+| `RUST_BACKTRACE` | Enable backtraces on panic | No | `1` |
 
-This implementation provides the foundation for:
-- Task management REST API endpoints (Task 5.2)
-- Message management API endpoints (Task 5.3)
-- Model listing and configuration endpoints (Task 5.4)
-- WebSocket gateway for real-time updates (Task 6.1-6.2)
+### Health Check
 
-The middleware stack and application structure are now ready to support these additional features.
+The service includes a built-in health check endpoint at `/health` that:
+- Verifies database connectivity
+- Returns service status and version information
+- Provides database connection pool statistics
+
+Health check endpoint: `http://localhost:9991/health`
+
+### Multi-Stage Build
+
+The Dockerfile uses a multi-stage build approach:
+
+1. **Builder Stage**: Uses `rust:1.75-slim` to compile the application
+2. **Runtime Stage**: Uses `debian:bookworm-slim` for a minimal production image
+
+This approach significantly reduces the final image size while maintaining all necessary runtime dependencies.
+
+### Security Features
+
+- Runs as non-root user (`bytebot`)
+- Minimal runtime dependencies
+- No unnecessary packages in production image
+- Proper file permissions and ownership
+
+### Ports
+
+- **9991**: HTTP API and WebSocket endpoints
+
+### Volume Mounts
+
+No persistent volumes are required for the agent service itself, but ensure your database is properly configured with persistent storage.

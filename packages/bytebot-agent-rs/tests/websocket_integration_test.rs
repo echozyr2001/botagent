@@ -2,10 +2,11 @@ use std::{sync::Arc, time::Duration};
 
 use bytebot_agent_rs::{
     ai::UnifiedAIService,
+    auth::{AuthService, AuthServiceTrait},
     config::Config,
     database::DatabaseManager,
     server::{create_app, AppState},
-    websocket::{events::ServerMessage, WebSocketGateway},
+    websocket::WebSocketGateway,
 };
 use bytebot_shared_rs::types::{Message, Role, Task, TaskPriority, TaskStatus, TaskType};
 use serde_json::json;
@@ -68,10 +69,17 @@ async fn test_websocket_server_integration() {
     // Create a minimal database manager for testing (will fail but that's ok for this test)
     let database_url = "postgresql://localhost:5432/test_nonexistent";
     if let Ok(db) = DatabaseManager::new(database_url).await {
+        let auth_service: Arc<dyn AuthServiceTrait> = Arc::new(AuthService::new(
+            db.get_pool(),
+            config.jwt_secret.clone(),
+            config.auth_enabled,
+        ));
+
         let app_state = AppState {
             config,
             db: Arc::new(db),
             ai_service,
+            auth_service,
             websocket_gateway: websocket_gateway.clone(),
         };
 

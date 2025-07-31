@@ -1,7 +1,10 @@
 use std::io::Cursor;
 
 use base64::{engine::general_purpose, Engine as _};
-use bytebot_shared_rs::types::computer_action::Coordinates;
+use bytebot_shared_rs::{
+    logging::automation_logging,
+    types::computer_action::Coordinates,
+};
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use screenshots::Screen;
 use tracing::{debug, error, info};
@@ -34,7 +37,7 @@ impl ScreenService {
 
     /// Take a screenshot of the primary screen and return as base64 encoded PNG
     pub async fn take_screenshot(&self) -> Result<String, AutomationError> {
-        debug!("Taking screenshot of primary screen");
+        debug!(screen = "primary", "Taking screenshot");
 
         // Use the first screen as primary
         let screen = self
@@ -51,12 +54,16 @@ impl ScreenService {
             })?;
 
         let image = image_result.map_err(|e| {
-            error!("Screenshot capture failed: {}", e);
+            error!(error = %e, "Screenshot capture failed");
             AutomationError::ScreenshotFailed(format!("Screen capture failed: {e}"))
         })?;
 
         // Convert to base64
-        self.image_to_base64(image).await
+        let result = self.image_to_base64(image).await;
+        if result.is_ok() {
+            automation_logging::screenshot_taken();
+        }
+        result
     }
 
     /// Take a screenshot of a specific screen by index
