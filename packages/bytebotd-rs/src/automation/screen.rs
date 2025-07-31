@@ -1,10 +1,7 @@
 use std::io::Cursor;
 
 use base64::{engine::general_purpose, Engine as _};
-use bytebot_shared_rs::{
-    logging::automation_logging,
-    types::computer_action::Coordinates,
-};
+use bytebot_shared_rs::{logging::automation_logging, types::computer_action::Coordinates};
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use screenshots::Screen;
 use tracing::{debug, error, info};

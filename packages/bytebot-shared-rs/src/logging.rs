@@ -3,12 +3,7 @@ use std::env;
 use serde_json::json;
 use tracing::{Level, Subscriber};
 use tracing_subscriber::{
-    fmt::{
-        time::UtcTime,
-    },
-    layer::SubscriberExt,
-    registry::LookupSpan,
-    util::SubscriberInitExt,
+    fmt::time::UtcTime, layer::SubscriberExt, registry::LookupSpan, util::SubscriberInitExt,
     EnvFilter, Registry,
 };
 
@@ -234,11 +229,7 @@ pub mod task_logging {
     use tracing::{error, info, warn};
 
     pub fn task_created(task_id: &str, description: &str) {
-        info!(
-            task_id = task_id,
-            description = description,
-            "Task created"
-        );
+        info!(task_id = task_id, description = description, "Task created");
     }
 
     pub fn task_started(task_id: &str) {
@@ -339,7 +330,12 @@ pub mod ai_logging {
         );
     }
 
-    pub fn ai_request_completed(provider: &str, model: &str, duration_ms: u64, tokens_used: Option<u32>) {
+    pub fn ai_request_completed(
+        provider: &str,
+        model: &str,
+        duration_ms: u64,
+        tokens_used: Option<u32>,
+    ) {
         info!(
             provider = provider,
             model = model,
@@ -426,7 +422,10 @@ pub mod database_logging {
     }
 
     pub fn migration_started(migration_name: &str) {
-        info!(migration_name = migration_name, "Database migration started");
+        info!(
+            migration_name = migration_name,
+            "Database migration started"
+        );
     }
 
     pub fn migration_completed(migration_name: &str, duration_ms: u64) {
@@ -486,8 +485,9 @@ impl LogLevelController {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::env;
+
+    use super::*;
 
     #[test]
     fn test_logging_config_from_env() {
