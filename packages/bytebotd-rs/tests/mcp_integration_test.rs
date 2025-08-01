@@ -12,7 +12,8 @@ use tower::ServiceExt;
 /// Create a test application with MCP routes
 async fn create_test_app() -> Router {
     let automation_service = Arc::new(AutomationService::new().unwrap());
-    routes::create_routes(automation_service)
+    let metrics = Arc::new(bytebot_shared_rs::MetricsCollector::new("test-service").unwrap());
+    routes::create_routes(automation_service, metrics)
 }
 
 #[tokio::test]
@@ -47,8 +48,7 @@ async fn test_mcp_server_integration() {
     for expected_tool in &expected_tools {
         assert!(
             tool_names.contains(expected_tool),
-            "Missing tool: {}",
-            expected_tool
+            "Missing tool: {expected_tool}"
         );
     }
 }
@@ -206,14 +206,11 @@ async fn test_mcp_tool_descriptions() {
         assert!(!name.is_empty(), "Tool name is empty");
         assert!(
             !description.is_empty(),
-            "Tool {} has empty description",
-            name
+            "Tool {name} has empty description"
         );
         assert!(
             description.len() > 10,
-            "Tool {} description is too short: {}",
-            name,
-            description
+            "Tool {name} description is too short: {description}"
         );
     }
 

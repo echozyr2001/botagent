@@ -54,9 +54,17 @@ validator = { workspace = true }
 # Shared types
 bytebot-shared-rs = { path = "../bytebot-shared-rs" }
 
+# Metrics and observability
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+metrics-util = { workspace = true }
+
 # Configuration
 envy = "0.4"
 dotenvy = "0.15"
+
+# System information
+num_cpus = "1.16"
 
 [dev-dependencies]
 mockall = { workspace = true }

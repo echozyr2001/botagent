@@ -75,7 +75,9 @@ impl WebSocketGateway {
                     async move {
                         let socket_id = socket.id.to_string();
                         websocket_logging::client_disconnected(&socket_id);
-                        connection_manager.handle_disconnection(socket_id).await;
+                        connection_manager
+                            .handle_disconnection(socket_id)
+                            .await;
                     }
                 }
             });
@@ -88,10 +90,7 @@ impl WebSocketGateway {
                     async move {
                         match Self::handle_join_task(&connection_manager, &socket, data).await {
                             Ok(task_id) => {
-                                websocket_logging::client_joined_task(
-                                    &socket.id.to_string(),
-                                    &task_id,
-                                );
+                                websocket_logging::client_joined_task(&socket.id.to_string(), &task_id);
                                 let response = ServerMessage::TaskJoined { task_id };
                                 if let Err(e) = socket.emit("task_joined", response) {
                                     error!(error = %e, "Failed to emit task_joined");
@@ -119,10 +118,7 @@ impl WebSocketGateway {
                     async move {
                         match Self::handle_leave_task(&connection_manager, &socket, data).await {
                             Ok(task_id) => {
-                                websocket_logging::client_left_task(
-                                    &socket.id.to_string(),
-                                    &task_id,
-                                );
+                                websocket_logging::client_left_task(&socket.id.to_string(), &task_id);
                                 let response = ServerMessage::TaskLeft { task_id };
                                 if let Err(e) = socket.emit("task_left", response) {
                                     error!(error = %e, "Failed to emit task_left");
@@ -214,10 +210,7 @@ impl WebSocketGateway {
         let room_name = format!("task_{task_id}");
         let message = ServerMessage::TaskUpdated { task: task.clone() };
 
-        let client_count = self
-            .connection_manager
-            .get_room_client_count(&room_name)
-            .await;
+        let client_count = self.connection_manager.get_room_client_count(&room_name).await;
         if let Err(e) = self.io.to(room_name.clone()).emit("task_updated", message) {
             error!(
                 room = %room_name,
@@ -237,10 +230,7 @@ impl WebSocketGateway {
             message: message.clone(),
         };
 
-        let client_count = self
-            .connection_manager
-            .get_room_client_count(&room_name)
-            .await;
+        let client_count = self.connection_manager.get_room_client_count(&room_name).await;
         if let Err(e) = self
             .io
             .to(room_name.clone())
@@ -299,10 +289,7 @@ impl WebSocketGateway {
         let room_name = format!("task_{task_id}");
         let event_name = event_name.to_string();
 
-        let client_count = self
-            .connection_manager
-            .get_room_client_count(&room_name)
-            .await;
+        let client_count = self.connection_manager.get_room_client_count(&room_name).await;
         if let Err(e) = self.io.to(room_name.clone()).emit(event_name.clone(), data) {
             error!(
                 event_type = %event_name,

@@ -8,7 +8,10 @@ use bytebot_agent_rs::{
     server::{create_app, AppState},
     websocket::WebSocketGateway,
 };
-use bytebot_shared_rs::types::{Message, Role, Task, TaskPriority, TaskStatus, TaskType};
+use bytebot_shared_rs::{
+    types::{Message, Role, Task, TaskPriority, TaskStatus, TaskType},
+    MetricsCollector,
+};
 use serde_json::json;
 use tokio::time::timeout;
 
@@ -81,6 +84,8 @@ async fn test_websocket_server_integration() {
             ai_service,
             auth_service,
             websocket_gateway: websocket_gateway.clone(),
+            metrics: Arc::new(MetricsCollector::new("test-service").unwrap()),
+            start_time: chrono::Utc::now(),
         };
 
         // Create the app with WebSocket integration

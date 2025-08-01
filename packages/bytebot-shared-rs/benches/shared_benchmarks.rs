@@ -111,42 +111,58 @@ fn benchmark_type_serialization(c: &mut Criterion) {
 
     // Task serialization
     group.bench_function("task_serialize", |b| {
-        b.iter(|| black_box(serde_json::to_string(&task).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::to_string(&task).unwrap())
+        })
     });
 
     let task_json = serde_json::to_string(&task).unwrap();
     group.bench_function("task_deserialize", |b| {
-        b.iter(|| black_box(serde_json::from_str::<Task>(&task_json).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::from_str::<Task>(&task_json).unwrap())
+        })
     });
 
     // Message serialization
     group.bench_function("message_serialize", |b| {
-        b.iter(|| black_box(serde_json::to_string(&message).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::to_string(&message).unwrap())
+        })
     });
 
     let message_json = serde_json::to_string(&message).unwrap();
     group.bench_function("message_deserialize", |b| {
-        b.iter(|| black_box(serde_json::from_str::<Message>(&message_json).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::from_str::<Message>(&message_json).unwrap())
+        })
     });
 
     // Computer action serialization
     group.bench_function("computer_action_serialize", |b| {
-        b.iter(|| black_box(serde_json::to_string(&action).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::to_string(&action).unwrap())
+        })
     });
 
     let action_json = serde_json::to_string(&action).unwrap();
     group.bench_function("computer_action_deserialize", |b| {
-        b.iter(|| black_box(serde_json::from_str::<ComputerAction>(&action_json).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::from_str::<ComputerAction>(&action_json).unwrap())
+        })
     });
 
     // DTO serialization
     group.bench_function("dto_serialize", |b| {
-        b.iter(|| black_box(serde_json::to_string(&dto).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::to_string(&dto).unwrap())
+        })
     });
 
     let dto_json = serde_json::to_string(&dto).unwrap();
     group.bench_function("dto_deserialize", |b| {
-        b.iter(|| black_box(serde_json::from_str::<CreateTaskDto>(&dto_json).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::from_str::<CreateTaskDto>(&dto_json).unwrap())
+        })
     });
 
     group.finish();
@@ -159,14 +175,22 @@ fn benchmark_type_validation(c: &mut Criterion) {
     let mut group = c.benchmark_group("type_validation");
 
     group.bench_function("task_validation", |b| {
-        b.iter(|| black_box(task.validate_integrity().unwrap()))
+        b.iter(|| {
+            black_box(task.validate_integrity().unwrap())
+        })
     });
 
     group.bench_function("task_is_terminal", |b| {
-        b.iter(|| black_box(task.is_terminal()))
+        b.iter(|| {
+            black_box(task.is_terminal())
+        })
     });
 
-    group.bench_function("task_is_active", |b| b.iter(|| black_box(task.is_active())));
+    group.bench_function("task_is_active", |b| {
+        b.iter(|| {
+            black_box(task.is_active())
+        })
+    });
 
     group.finish();
 }
@@ -253,7 +277,11 @@ fn benchmark_collection_operations(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("task_collection_serialize", size),
             size,
-            |b, _| b.iter(|| black_box(serde_json::to_string(&tasks).unwrap())),
+            |b, _| {
+                b.iter(|| {
+                    black_box(serde_json::to_string(&tasks).unwrap())
+                })
+            },
         );
 
         // Message collection creation
@@ -266,11 +294,7 @@ fn benchmark_collection_operations(c: &mut Criterion) {
                         .map(|i| {
                             Message::new(
                                 vec![MessageContentBlock::text(&format!("Message {}", i))],
-                                if i % 2 == 0 {
-                                    Role::User
-                                } else {
-                                    Role::Assistant
-                                },
+                                if i % 2 == 0 { Role::User } else { Role::Assistant },
                                 format!("task-{}", i),
                             )
                         })
@@ -307,8 +331,7 @@ fn benchmark_memory_usage(c: &mut Criterion) {
             count,
             |b, count| {
                 b.iter(|| {
-                    let messages: Vec<Message> =
-                        (0..*count).map(|_| create_test_message()).collect();
+                    let messages: Vec<Message> = (0..*count).map(|_| create_test_message()).collect();
                     black_box(messages)
                 })
             },
@@ -346,21 +369,23 @@ fn benchmark_complex_data_structures(c: &mut Criterion) {
         vec![
             MessageContentBlock::text("Simple text block"),
             MessageContentBlock::text("Another text block with more content"),
-            MessageContentBlock::text(
-                "Yet another block with even more detailed content for testing",
-            ),
+            MessageContentBlock::text("Yet another block with even more detailed content for testing"),
         ],
         Role::Assistant,
         "complex-task-id".to_string(),
     );
 
     group.bench_function("complex_message_serialize", |b| {
-        b.iter(|| black_box(serde_json::to_string(&complex_message).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::to_string(&complex_message).unwrap())
+        })
     });
 
     let complex_message_json = serde_json::to_string(&complex_message).unwrap();
     group.bench_function("complex_message_deserialize", |b| {
-        b.iter(|| black_box(serde_json::from_str::<Message>(&complex_message_json).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::from_str::<Message>(&complex_message_json).unwrap())
+        })
     });
 
     // Complex computer action with multiple coordinates
@@ -380,12 +405,16 @@ fn benchmark_complex_data_structures(c: &mut Criterion) {
     };
 
     group.bench_function("complex_action_serialize", |b| {
-        b.iter(|| black_box(serde_json::to_string(&complex_action).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::to_string(&complex_action).unwrap())
+        })
     });
 
     let complex_action_json = serde_json::to_string(&complex_action).unwrap();
     group.bench_function("complex_action_deserialize", |b| {
-        b.iter(|| black_box(serde_json::from_str::<ComputerAction>(&complex_action_json).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::from_str::<ComputerAction>(&complex_action_json).unwrap())
+        })
     });
 
     group.finish();

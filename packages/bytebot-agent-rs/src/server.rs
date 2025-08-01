@@ -15,9 +15,11 @@ use crate::{
     config::Config,
     database::DatabaseManager,
     error::ServiceError,
-    routes::{create_auth_routes, create_message_routes, create_task_routes},
+    routes::{create_auth_routes, create_message_routes, create_task_routes, health::*},
     websocket::WebSocketGateway,
 };
+use bytebot_shared_rs::{MetricsCollector, middleware::metrics_middleware};
+use chrono::Utc;
 
 /// Application state shared across handlers
 #[derive(Clone)]
@@ -27,10 +29,20 @@ pub struct AppState {
     pub ai_service: Arc<UnifiedAIService>,
     pub auth_service: Arc<dyn AuthServiceTrait>,
     pub websocket_gateway: Arc<WebSocketGateway>,
+    pub metrics: Arc<MetricsCollector>,
+    pub start_time: chrono::DateTime<Utc>,
 }
 
 /// Create AppState with all services initialized
 pub async fn create_app_state(config: Arc<Config>) -> Result<AppState, ServiceError> {
+    let start_time = Utc::now();
+    
+    // Initialize metrics collector
+    let metrics = Arc::new(
+        MetricsCollector::new("bytebot-agent-rs")
+            .map_err(|e| ServiceError::Internal(format!("Metrics initialization failed: {e}")))?,
+    );
+
     // Initialize database manager
     let db = Arc::new(
         DatabaseManager::new(&config.database_url)
@@ -57,6 +69,8 @@ pub async fn create_app_state(config: Arc<Config>) -> Result<AppState, ServiceEr
         ai_service,
         auth_service,
         websocket_gateway,
+        metrics,
+        start_time,
     })
 }
 
@@ -81,14 +95,26 @@ pub fn create_app(state: AppState) -> Router {
         .on_request(DefaultOnRequest::new().level(Level::INFO))
         .on_response(DefaultOnResponse::new().level(Level::INFO));
 
-    // Build middleware stack
-    let middleware = ServiceBuilder::new().layer(trace_layer).layer(cors);
+    // Build middleware stack with metrics
+    let middleware = ServiceBuilder::new()
+        .layer(axum::middleware::from_fn(metrics_middleware))
+        .layer(trace_layer)
+        .layer(cors);
 
-    // Create router with health check endpoint and all routes
+    // Create health state for health endpoints
+    let health_state = HealthState {
+        db_pool: (*state.db.get_pool()).clone(),
+        metrics: state.metrics.clone(),
+        start_time: state.start_time,
+    };
+
+    // Create router with enhanced health check endpoints and all routes
     Router::new()
+        // Basic health endpoints
         .route("/health", get(health_check))
-        .route("/api/health", get(health_check)) // Match global prefix pattern
-        .route("/ws-stats", get(websocket_stats)) // WebSocket statistics endpoint
+        .route("/api/health", get(health_check))
+        // WebSocket statistics endpoint
+        .route("/ws-stats", get(websocket_stats))
         // Authentication routes (public)
         .nest(
             "/auth",
@@ -113,9 +139,22 @@ pub fn create_app(state: AppState) -> Router {
                 optional_auth_middleware,
             )),
         )
+        .with_state(state.clone())
+        // Add health endpoints with specific state
+        .merge(
+            Router::new()
+                .route("/health/detailed", get(health_detailed))
+                .route("/api/health/detailed", get(health_detailed))
+                .route("/health/ready", get(readiness))
+                .route("/health/live", get(liveness))
+                .route("/api/health/ready", get(readiness))
+                .route("/api/health/live", get(liveness))
+                .route("/metrics", get(metrics))
+                .route("/api/metrics", get(metrics))
+                .with_state(health_state)
+        )
         // Integrate Socket.IO WebSocket server - socketioxide provides its own layer
         .layer(state.websocket_gateway.layer())
-        .with_state(state)
         .layer(middleware)
 }
 
@@ -195,6 +234,12 @@ mod tests {
                     .route("/ws-stats", get(|| async { "test" }));
             }
         };
+        
+        let metrics = Arc::new(
+            MetricsCollector::new("test-service")
+                .unwrap_or_else(|_| panic!("Failed to create metrics collector"))
+        );
+        
         let ai_service = Arc::new(UnifiedAIService::new(&config));
         let auth_service: Arc<dyn AuthServiceTrait> = Arc::new(AuthService::new(
             db.get_pool(),
@@ -208,6 +253,8 @@ mod tests {
             ai_service,
             auth_service,
             websocket_gateway,
+            metrics,
+            start_time: Utc::now(),
         };
         create_app(state)
     }

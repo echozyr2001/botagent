@@ -266,12 +266,16 @@ fn benchmark_action_serialization(c: &mut Criterion) {
 
     for (i, action) in actions.iter().enumerate() {
         group.bench_function(&format!("serialize_action_{}", i), |b| {
-            b.iter(|| black_box(serde_json::to_string(action).unwrap()))
+            b.iter(|| {
+                black_box(serde_json::to_string(action).unwrap())
+            })
         });
 
         let serialized = serde_json::to_string(action).unwrap();
         group.bench_function(&format!("deserialize_action_{}", i), |b| {
-            b.iter(|| black_box(serde_json::from_str::<ComputerAction>(&serialized).unwrap()))
+            b.iter(|| {
+                black_box(serde_json::from_str::<ComputerAction>(&serialized).unwrap())
+            })
         });
     }
 

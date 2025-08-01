@@ -11,7 +11,10 @@ use axum::http::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
     HeaderValue, Method,
 };
-use bytebot_shared_rs::logging::{init_logging, LoggingConfig};
+use bytebot_shared_rs::{
+    logging::{init_logging, LoggingConfig},
+    MetricsCollector,
+};
 use tower_http::cors::CorsLayer;
 use tracing::{error, info};
 
@@ -23,7 +26,7 @@ async fn main() -> Result<()> {
     // Initialize structured logging
     let logging_config = LoggingConfig::for_service("bytebotd-rs");
     init_logging(logging_config).map_err(|e| {
-        eprintln!("Failed to initialize logging: {}", e);
+        eprintln!("Failed to initialize logging: {e}");
         anyhow::anyhow!("Logging initialization failed: {}", e)
     })?;
 
@@ -40,6 +43,14 @@ async fn main() -> Result<()> {
     })?;
 
     info!(config = ?config, "Configuration loaded successfully");
+
+    // Initialize metrics collector
+    let metrics = Arc::new(MetricsCollector::new("bytebotd-rs").map_err(|e| {
+        error!(error = %e, "Failed to initialize metrics collector");
+        anyhow::anyhow!("Metrics collector initialization failed: {}", e)
+    })?);
+
+    info!("Metrics collector initialized successfully");
 
     // Initialize automation service
     let automation_service = Arc::new(automation::AutomationService::new().map_err(|e| {
@@ -63,8 +74,8 @@ async fn main() -> Result<()> {
         .allow_headers([AUTHORIZATION, ACCEPT, CONTENT_TYPE])
         .allow_credentials(true);
 
-    // Create routes
-    let app = routes::create_routes(automation_service)
+    // Create routes with metrics
+    let app = routes::create_routes(automation_service, metrics)
         .layer(cors)
         .layer(tower_http::trace::TraceLayer::new_for_http());
 

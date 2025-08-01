@@ -74,6 +74,11 @@ tokio-test = "0.4"
 # Development tools
 criterion = { version = "0.5", features = ["html_reports"] }
 
+# Metrics and observability
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+metrics-util = "0.16"
+
 [profile.dev]
 opt-level = 0
 debug = true

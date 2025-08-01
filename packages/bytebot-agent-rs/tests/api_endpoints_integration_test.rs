@@ -546,7 +546,9 @@ async fn test_message_endpoints() {
     let (_user_id, token) = match create_test_user_and_token(&app).await {
         Ok(result) => result,
         Err(e) => {
-            println!("Skipping message endpoints test - user creation failed: {e}");
+            println!(
+                "Skipping message endpoints test - user creation failed: {e}"
+            );
             return;
         }
     };

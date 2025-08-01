@@ -13,6 +13,7 @@ use bytebot_agent_rs::{
     server::AppState,
     websocket::WebSocketGateway,
 };
+use bytebot_shared_rs::MetricsCollector;
 use serde_json::Value;
 use tower::ServiceExt;
 
@@ -54,6 +55,8 @@ async fn test_models_endpoint_integration() {
         ai_service: Arc::new(ai_service),
         auth_service,
         websocket_gateway,
+        metrics: Arc::new(MetricsCollector::new("test-service").unwrap()),
+        start_time: chrono::Utc::now(),
     };
 
     // Create the router
@@ -164,6 +167,8 @@ async fn test_models_endpoint_no_keys() {
         ai_service: Arc::new(ai_service),
         auth_service,
         websocket_gateway,
+        metrics: Arc::new(MetricsCollector::new("test-service").unwrap()),
+        start_time: chrono::Utc::now(),
     };
 
     // Create the router

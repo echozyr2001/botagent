@@ -46,12 +46,20 @@ bytebot-shared-rs = { path = "../bytebot-shared-rs" }
 rmcp = { version = "0.1", features = ["transport-io", "macros"] }
 schemars = { version = "0.8", features = ["derive"] }
 
+# Metrics and observability
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+metrics-util = { workspace = true }
+
 # Configuration
 envy = "0.4"
 dotenvy = "0.15"
 
 # Directory utilities
 dirs = "5.0"
+
+# System information
+num_cpus = "1.16"
 
 # Platform-specific dependencies
 [target.'cfg(unix)'.dependencies]

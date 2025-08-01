@@ -7,9 +7,12 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use bytebot_shared_rs::types::{
-    api::{ApiResponse, CreateTaskDto, PaginatedResponse, PaginationParams, UpdateTaskDto},
-    task::{Task, TaskStatus},
+use bytebot_shared_rs::{
+    types::{
+        api::{ApiResponse, CreateTaskDto, PaginatedResponse, PaginationParams, UpdateTaskDto},
+        task::{Task, TaskStatus},
+    },
+    MetricsCollector,
 };
 use serde_json::{json, Value};
 use tracing::{debug, info};
@@ -438,6 +441,8 @@ mod tests {
                     ai_service,
                     auth_service,
                     websocket_gateway,
+                    metrics: Arc::new(MetricsCollector::new("test-service").unwrap()),
+                    start_time: chrono::Utc::now(),
                 }
             }
             Err(_) => {
@@ -463,6 +468,8 @@ mod tests {
                 ai_service,
                 auth_service,
                 websocket_gateway: Arc::new(WebSocketGateway::new()),
+                metrics: Arc::new(MetricsCollector::new("test-service").unwrap()),
+                start_time: chrono::Utc::now(),
             })
         } else {
             None

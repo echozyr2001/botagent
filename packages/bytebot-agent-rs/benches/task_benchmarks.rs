@@ -1,6 +1,8 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
+use std::time::Duration;
 
-use bytebot_agent_rs::database::{DatabaseError, TaskRepositoryTrait};
+use bytebot_agent_rs::database::TaskRepositoryTrait;
+use bytebot_agent_rs::database::DatabaseError;
 use bytebot_shared_rs::types::{
     api::{CreateTaskDto, PaginationParams, UpdateTaskDto},
     task::{Role, Task, TaskPriority, TaskStatus, TaskType},
@@ -73,13 +75,11 @@ impl TaskRepositoryTrait for MockTaskRepository {
             queued_at: None,
             error: None,
             result: None,
-            model: dto.model.clone().unwrap_or_else(|| {
-                json!({
-                    "provider": "anthropic",
-                    "name": "claude-3-sonnet-20240229",
-                    "title": "Claude 3 Sonnet"
-                })
-            }),
+            model: dto.model.clone().unwrap_or_else(|| json!({
+                "provider": "anthropic",
+                "name": "claude-3-sonnet-20240229",
+                "title": "Claude 3 Sonnet"
+            })),
             user_id: dto.user_id.clone(),
         };
         Ok(task)
@@ -117,8 +117,7 @@ impl TaskRepositoryTrait for MockTaskRepository {
     }
 
     async fn get_tasks_by_status(&self, status: TaskStatus) -> Result<Vec<Task>, DatabaseError> {
-        let tasks: Vec<Task> = self
-            .tasks
+        let tasks: Vec<Task> = self.tasks
             .values()
             .filter(|t| t.status == status)
             .cloned()
@@ -126,12 +125,8 @@ impl TaskRepositoryTrait for MockTaskRepository {
         Ok(tasks)
     }
 
-    async fn get_scheduled_tasks(
-        &self,
-        _before: chrono::DateTime<Utc>,
-    ) -> Result<Vec<Task>, DatabaseError> {
-        let tasks: Vec<Task> = self
-            .tasks
+    async fn get_scheduled_tasks(&self, _before: chrono::DateTime<Utc>) -> Result<Vec<Task>, DatabaseError> {
+        let tasks: Vec<Task> = self.tasks
             .values()
             .filter(|t| t.task_type == TaskType::Scheduled)
             .cloned()
@@ -139,9 +134,7 @@ impl TaskRepositoryTrait for MockTaskRepository {
         Ok(tasks)
     }
 
-    async fn count_by_status(
-        &self,
-    ) -> Result<std::collections::HashMap<TaskStatus, u64>, DatabaseError> {
+    async fn count_by_status(&self) -> Result<std::collections::HashMap<TaskStatus, u64>, DatabaseError> {
         let mut counts = std::collections::HashMap::new();
         for task in self.tasks.values() {
             *counts.entry(task.status).or_insert(0) += 1;
@@ -201,7 +194,11 @@ fn benchmark_task_retrieval(c: &mut Criterion) {
     c.bench_function("task_retrieval", |b| {
         b.iter_batched(
             || task_ids[fastrand::usize(..task_ids.len())].clone(),
-            |task_id| rt.block_on(async { black_box(repo.get_by_id(&task_id).await.unwrap()) }),
+            |task_id| {
+                rt.block_on(async {
+                    black_box(repo.get_by_id(&task_id).await.unwrap())
+                })
+            },
             BatchSize::SmallInput,
         )
     });
@@ -209,9 +206,9 @@ fn benchmark_task_retrieval(c: &mut Criterion) {
 
 fn benchmark_task_listing(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-
+    
     let mut group = c.benchmark_group("task_listing");
-
+    
     for size in [10, 100, 1000, 10000].iter() {
         let repo = MockTaskRepository::new().with_tasks(*size);
         let filter = bytebot_agent_rs::database::TaskFilter::default();
@@ -222,11 +219,13 @@ fn benchmark_task_listing(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::new("list_tasks", size), size, |b, _| {
             b.iter(|| {
-                rt.block_on(async { black_box(repo.list(&filter, &pagination).await.unwrap()) })
+                rt.block_on(async {
+                    black_box(repo.list(&filter, &pagination).await.unwrap())
+                })
             })
         });
     }
-
+    
     group.finish();
 }
 
@@ -235,38 +234,34 @@ fn benchmark_concurrent_task_operations(c: &mut Criterion) {
     let repo = Arc::new(MockTaskRepository::new().with_tasks(1000));
 
     let mut group = c.benchmark_group("concurrent_operations");
-
+    
     for concurrency in [1, 5, 10, 20, 50].iter() {
-        group.bench_with_input(
-            BenchmarkId::new("concurrent_creates", concurrency),
-            concurrency,
-            |b, &concurrency| {
-                b.iter(|| {
-                    rt.block_on(async {
-                        let repo = repo.clone();
-                        let handles: Vec<_> = (0..concurrency)
-                            .map(|_| {
-                                let repo = repo.clone();
-                                tokio::spawn(async move {
-                                    let dto = create_test_task_dto();
-                                    repo.create(&dto).await.unwrap()
-                                })
+        group.bench_with_input(BenchmarkId::new("concurrent_creates", concurrency), concurrency, |b, &concurrency| {
+            b.iter(|| {
+                rt.block_on(async {
+                    let repo = repo.clone();
+                    let handles: Vec<_> = (0..concurrency)
+                        .map(|_| {
+                            let repo = repo.clone();
+                            tokio::spawn(async move {
+                                let dto = create_test_task_dto();
+                                repo.create(&dto).await.unwrap()
                             })
-                            .collect();
+                        })
+                        .collect();
 
-                        let results: Vec<_> = futures::future::join_all(handles)
-                            .await
-                            .into_iter()
-                            .map(|r| r.unwrap())
-                            .collect();
-
-                        black_box(results)
-                    })
+                    let results: Vec<_> = futures::future::join_all(handles)
+                        .await
+                        .into_iter()
+                        .map(|r| r.unwrap())
+                        .collect();
+                    
+                    black_box(results)
                 })
-            },
-        );
+            })
+        });
     }
-
+    
     group.finish();
 }
 
@@ -297,12 +292,16 @@ fn benchmark_task_serialization(c: &mut Criterion) {
     };
 
     c.bench_function("task_serialization", |b| {
-        b.iter(|| black_box(serde_json::to_string(&task).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::to_string(&task).unwrap())
+        })
     });
 
     let serialized = serde_json::to_string(&task).unwrap();
     c.bench_function("task_deserialization", |b| {
-        b.iter(|| black_box(serde_json::from_str::<Task>(&serialized).unwrap()))
+        b.iter(|| {
+            black_box(serde_json::from_str::<Task>(&serialized).unwrap())
+        })
     });
 }
 
@@ -333,52 +332,50 @@ fn benchmark_task_validation(c: &mut Criterion) {
     };
 
     c.bench_function("task_validation", |b| {
-        b.iter(|| black_box(task.validate_integrity().unwrap()))
+        b.iter(|| {
+            black_box(task.validate_integrity().unwrap())
+        })
     });
 }
 
 // Memory usage benchmarks
 fn benchmark_memory_usage(c: &mut Criterion) {
     let mut group = c.benchmark_group("memory_usage");
-
+    
     for count in [100, 1000, 10000].iter() {
-        group.bench_with_input(
-            BenchmarkId::new("task_creation_memory", count),
-            count,
-            |b, &count| {
-                b.iter(|| {
-                    let tasks: Vec<Task> = (0..count)
-                        .map(|i| Task {
-                            id: Uuid::new_v4().to_string(),
-                            description: format!("Test task {}", i),
-                            task_type: TaskType::Immediate,
-                            status: TaskStatus::Pending,
-                            priority: TaskPriority::Medium,
-                            control: Role::Assistant,
-                            created_at: Utc::now(),
-                            created_by: Role::User,
-                            scheduled_for: None,
-                            updated_at: Utc::now(),
-                            executed_at: None,
-                            completed_at: None,
-                            queued_at: None,
-                            error: None,
-                            result: None,
-                            model: json!({
-                                "provider": "anthropic",
-                                "name": "claude-3-sonnet-20240229",
-                                "title": "Claude 3 Sonnet"
-                            }),
-                            user_id: Some("test-user".to_string()),
-                        })
-                        .collect();
-
-                    black_box(tasks)
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("task_creation_memory", count), count, |b, &count| {
+            b.iter(|| {
+                let tasks: Vec<Task> = (0..count)
+                    .map(|i| Task {
+                        id: Uuid::new_v4().to_string(),
+                        description: format!("Test task {}", i),
+                        task_type: TaskType::Immediate,
+                        status: TaskStatus::Pending,
+                        priority: TaskPriority::Medium,
+                        control: Role::Assistant,
+                        created_at: Utc::now(),
+                        created_by: Role::User,
+                        scheduled_for: None,
+                        updated_at: Utc::now(),
+                        executed_at: None,
+                        completed_at: None,
+                        queued_at: None,
+                        error: None,
+                        result: None,
+                        model: json!({
+                            "provider": "anthropic",
+                            "name": "claude-3-sonnet-20240229",
+                            "title": "Claude 3 Sonnet"
+                        }),
+                        user_id: Some("test-user".to_string()),
+                    })
+                    .collect();
+                
+                black_box(tasks)
+            })
+        });
     }
-
+    
     group.finish();
 }
 
@@ -389,17 +386,17 @@ fn benchmark_load_testing(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("load_testing");
     group.measurement_time(Duration::from_secs(10));
-
+    
     // Simulate mixed workload
     group.bench_function("mixed_workload", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let repo = repo.clone();
-
+                
                 // Simulate 70% reads, 20% creates, 10% updates
                 let operations = 100;
                 let mut handles = Vec::new();
-
+                
                 for i in 0..operations {
                     let repo = repo.clone();
                     let handle = match i % 10 {
@@ -407,14 +404,11 @@ fn benchmark_load_testing(c: &mut Criterion) {
                             // Read operations (70%)
                             tokio::spawn(async move {
                                 let filter = bytebot_agent_rs::database::TaskFilter::default();
-                                let pagination = PaginationParams {
-                                    page: Some(1),
-                                    limit: Some(10),
-                                };
+                                let pagination = PaginationParams { page: Some(1), limit: Some(10) };
                                 repo.list(&filter, &pagination).await.unwrap();
                                 "read"
                             })
-                        }
+                        },
                         7..=8 => {
                             // Create operations (20%)
                             tokio::spawn(async move {
@@ -422,7 +416,7 @@ fn benchmark_load_testing(c: &mut Criterion) {
                                 repo.create(&dto).await.unwrap();
                                 "create"
                             })
-                        }
+                        },
                         _ => {
                             // Update operations (10%)
                             tokio::spawn(async move {
@@ -434,13 +428,13 @@ fn benchmark_load_testing(c: &mut Criterion) {
                     };
                     handles.push(handle);
                 }
-
+                
                 let _results = futures::future::join_all(handles).await;
                 black_box(())
             })
         })
     });
-
+    
     group.finish();
 }
 

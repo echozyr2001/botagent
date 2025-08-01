@@ -3,7 +3,12 @@ use std::env;
 use serde_json::json;
 use tracing::{Level, Subscriber};
 use tracing_subscriber::{
-    fmt::time::UtcTime, layer::SubscriberExt, registry::LookupSpan, util::SubscriberInitExt,
+    fmt::{
+        time::UtcTime,
+    },
+    layer::SubscriberExt,
+    registry::LookupSpan,
+    util::SubscriberInitExt,
     EnvFilter, Registry,
 };
 
@@ -229,7 +234,11 @@ pub mod task_logging {
     use tracing::{error, info, warn};
 
     pub fn task_created(task_id: &str, description: &str) {
-        info!(task_id = task_id, description = description, "Task created");
+        info!(
+            task_id = task_id,
+            description = description,
+            "Task created"
+        );
     }
 
     pub fn task_started(task_id: &str) {
@@ -330,12 +339,7 @@ pub mod ai_logging {
         );
     }
 
-    pub fn ai_request_completed(
-        provider: &str,
-        model: &str,
-        duration_ms: u64,
-        tokens_used: Option<u32>,
-    ) {
+    pub fn ai_request_completed(provider: &str, model: &str, duration_ms: u64, tokens_used: Option<u32>) {
         info!(
             provider = provider,
             model = model,
@@ -422,10 +426,7 @@ pub mod database_logging {
     }
 
     pub fn migration_started(migration_name: &str) {
-        info!(
-            migration_name = migration_name,
-            "Database migration started"
-        );
+        info!(migration_name = migration_name, "Database migration started");
     }
 
     pub fn migration_completed(migration_name: &str, duration_ms: u64) {
@@ -485,9 +486,8 @@ impl LogLevelController {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use super::*;
+    use std::env;
 
     #[test]
     fn test_logging_config_from_env() {
@@ -513,6 +513,11 @@ mod tests {
 
     #[test]
     fn test_logging_config_defaults() {
+        // Save current env vars
+        let saved_level = env::var("LOG_LEVEL").ok();
+        let saved_format = env::var("LOG_FORMAT").ok();
+        let saved_service = env::var("SERVICE_NAME").ok();
+
         // Ensure no relevant env vars are set
         env::remove_var("LOG_LEVEL");
         env::remove_var("LOG_FORMAT");
@@ -524,6 +529,17 @@ mod tests {
         assert!(!config.json_format);
         assert_eq!(config.service_name, "bytebot");
         assert!(!config.include_location);
+
+        // Restore env vars
+        if let Some(level) = saved_level {
+            env::set_var("LOG_LEVEL", level);
+        }
+        if let Some(format) = saved_format {
+            env::set_var("LOG_FORMAT", format);
+        }
+        if let Some(service) = saved_service {
+            env::set_var("SERVICE_NAME", service);
+        }
     }
 
     #[test]

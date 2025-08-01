@@ -36,6 +36,14 @@ axum = { workspace = true }
 reqwest = { workspace = true }
 jsonwebtoken = { version = "9.2" }
 
+# Metrics and observability
+metrics = { workspace = true }
+metrics-exporter-prometheus = { workspace = true }
+metrics-util = { workspace = true }
+
+# YAML serialization for monitoring configs
+serde_yaml = "0.9"
+
 [dev-dependencies]
 tokio-test = { workspace = true }
 criterion = { workspace = true }
