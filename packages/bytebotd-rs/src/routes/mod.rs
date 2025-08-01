@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use bytebot_shared_rs::{MetricsCollector, middleware::metrics_middleware};
+use bytebot_shared_rs::{middleware::metrics_middleware, MetricsCollector};
 use chrono::Utc;
 
 use crate::{automation::AutomationService, mcp::McpServer};
@@ -38,7 +38,7 @@ pub fn create_routes(
                 .route("/health/ready", get(health::readiness))
                 .route("/health/live", get(health::liveness))
                 .route("/metrics", get(health::metrics))
-                .with_state(health_state)
+                .with_state(health_state),
         )
         // Add metrics middleware
         .layer(axum::middleware::from_fn(metrics_middleware))

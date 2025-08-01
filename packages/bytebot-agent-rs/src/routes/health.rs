@@ -1,13 +1,10 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::Json,
-};
+use std::sync::Arc;
+
+use axum::{extract::State, http::StatusCode, response::Json};
 use bytebot_shared_rs::{MetricsCollector, MetricsTimer};
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use std::sync::Arc;
 use tracing::{error, info};
 
 /// Application state for health checks
@@ -31,19 +28,19 @@ pub async fn health_check() -> Json<Value> {
 /// Detailed health check with service status
 pub async fn health_detailed(State(state): State<HealthState>) -> Result<Json<Value>, StatusCode> {
     let timer = MetricsTimer::new();
-    
+
     // Check database connectivity
     let db_status = check_database_health(&state.db_pool).await;
-    
+
     // Calculate uptime
     let uptime_seconds = (Utc::now() - state.start_time).num_seconds();
-    
+
     // Get system metrics
     let system_info = get_system_info();
-    
+
     // Check AI service connectivity (basic check)
     let ai_services = check_ai_services().await;
-    
+
     let health_status = if db_status.is_healthy && ai_services.iter().any(|s| s.is_healthy) {
         "healthy"
     } else if db_status.is_healthy {
@@ -70,14 +67,16 @@ pub async fn health_detailed(State(state): State<HealthState>) -> Result<Json<Va
     });
 
     // Record health check metrics
-    state.metrics.record_db_query("health_check", "system", timer.elapsed());
+    state
+        .metrics
+        .record_db_query("health_check", "system", timer.elapsed());
 
     match health_status {
         "healthy" => Ok(Json(response)),
         "degraded" => {
             info!("Service is in degraded state");
             Ok(Json(response))
-        },
+        }
         _ => {
             error!("Service is unhealthy");
             Err(StatusCode::SERVICE_UNAVAILABLE)
@@ -89,7 +88,7 @@ pub async fn health_detailed(State(state): State<HealthState>) -> Result<Json<Va
 pub async fn readiness(State(state): State<HealthState>) -> Result<Json<Value>, StatusCode> {
     // Check if database is accessible
     let db_check = check_database_health(&state.db_pool).await;
-    
+
     if db_check.is_healthy {
         Ok(Json(json!({
             "status": "ready",
@@ -122,7 +121,7 @@ struct DatabaseHealth {
 
 async fn check_database_health(pool: &PgPool) -> DatabaseHealth {
     let timer = MetricsTimer::new();
-    
+
     match sqlx::query("SELECT 1 as health_check")
         .fetch_one(pool)
         .await
@@ -135,7 +134,7 @@ async fn check_database_health(pool: &PgPool) -> DatabaseHealth {
                 details: json!({
                     "connection_pool_size": pool.size(),
                     "idle_connections": pool.num_idle(),
-                })
+                }),
             }
         }
         Err(e) => {
@@ -145,7 +144,7 @@ async fn check_database_health(pool: &PgPool) -> DatabaseHealth {
                 response_time_ms: timer.elapsed().as_millis() as u64,
                 details: json!({
                     "error": e.to_string()
-                })
+                }),
             }
         }
     }
@@ -160,34 +159,34 @@ struct AIServiceHealth {
 
 async fn check_ai_services() -> Vec<AIServiceHealth> {
     let mut services = Vec::new();
-    
+
     // Check Anthropic
     services.push(AIServiceHealth {
         name: "anthropic".to_string(),
         is_healthy: std::env::var("ANTHROPIC_API_KEY").is_ok(),
         details: json!({
             "configured": std::env::var("ANTHROPIC_API_KEY").is_ok()
-        })
+        }),
     });
-    
+
     // Check OpenAI
     services.push(AIServiceHealth {
         name: "openai".to_string(),
         is_healthy: std::env::var("OPENAI_API_KEY").is_ok(),
         details: json!({
             "configured": std::env::var("OPENAI_API_KEY").is_ok()
-        })
+        }),
     });
-    
+
     // Check Google
     services.push(AIServiceHealth {
         name: "google".to_string(),
         is_healthy: std::env::var("GOOGLE_API_KEY").is_ok(),
         details: json!({
             "configured": std::env::var("GOOGLE_API_KEY").is_ok()
-        })
+        }),
     });
-    
+
     services
 }
 
@@ -211,7 +210,7 @@ fn get_memory_usage() -> Value {
 #[cfg(target_os = "linux")]
 fn get_rss_memory() -> u64 {
     use std::fs;
-    
+
     if let Ok(contents) = fs::read_to_string("/proc/self/status") {
         for line in contents.lines() {
             if line.starts_with("VmRSS:") {
@@ -234,15 +233,17 @@ fn get_rss_memory() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use sqlx::PgPool;
     use std::sync::Arc;
+
+    use sqlx::PgPool;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_health_check() {
         let response = health_check().await;
         let value: Value = response.0;
-        
+
         assert_eq!(value["status"], "healthy");
         assert_eq!(value["service"], "bytebot-agent-rs");
         assert!(value["timestamp"].is_string());
@@ -252,7 +253,7 @@ mod tests {
     async fn test_liveness() {
         let response = liveness().await;
         let value: Value = response.0;
-        
+
         assert_eq!(value["status"], "alive");
         assert!(value["timestamp"].is_string());
     }

@@ -1,12 +1,9 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::Json,
-};
+use std::sync::Arc;
+
+use axum::{extract::State, http::StatusCode, response::Json};
 use bytebot_shared_rs::{MetricsCollector, MetricsTimer};
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
-use std::sync::Arc;
 use tracing::{error, info, warn};
 
 /// Application state for health checks
@@ -36,19 +33,19 @@ pub async fn health_check() -> Json<Value> {
 /// Detailed health check with service status
 pub async fn health_detailed(State(state): State<HealthState>) -> Result<Json<Value>, StatusCode> {
     let timer = MetricsTimer::new();
-    
+
     // Check desktop automation capabilities
     let automation_status = check_automation_health().await;
-    
+
     // Calculate uptime
     let uptime_seconds = (Utc::now() - state.start_time).num_seconds();
-    
+
     // Get system info
     let system_info = get_system_info();
-    
+
     // Check display availability
     let display_status = check_display_health();
-    
+
     let health_status = if automation_status.is_healthy && display_status.is_healthy {
         "healthy"
     } else if automation_status.is_healthy || display_status.is_healthy {
@@ -78,14 +75,16 @@ pub async fn health_detailed(State(state): State<HealthState>) -> Result<Json<Va
 
     // Record health check duration
     let duration = timer.elapsed();
-    state.metrics.record_automation_action("health_check", duration);
+    state
+        .metrics
+        .record_automation_action("health_check", duration);
 
     match health_status {
         "healthy" => Ok(Json(response)),
         "degraded" => {
             warn!("Desktop automation service is in degraded state");
             Ok(Json(response))
-        },
+        }
         _ => {
             error!("Desktop automation service is unhealthy");
             Err(StatusCode::SERVICE_UNAVAILABLE)
@@ -97,7 +96,7 @@ pub async fn health_detailed(State(state): State<HealthState>) -> Result<Json<Va
 pub async fn readiness(State(state): State<HealthState>) -> Result<Json<Value>, StatusCode> {
     // Check if we can take a screenshot (basic automation test)
     let automation_check = check_automation_health().await;
-    
+
     if automation_check.is_healthy {
         Ok(Json(json!({
             "status": "ready",
@@ -129,21 +128,21 @@ struct AutomationHealth {
 
 async fn check_automation_health() -> AutomationHealth {
     let mut checks = Vec::new();
-    
+
     // Test screenshot capability
     let screenshot_ok = test_screenshot_capability().await;
     checks.push(("screenshot", screenshot_ok));
-    
+
     // Test mouse capability (basic check)
     let mouse_ok = test_mouse_capability();
     checks.push(("mouse", mouse_ok));
-    
+
     // Test keyboard capability (basic check)
     let keyboard_ok = test_keyboard_capability();
     checks.push(("keyboard", keyboard_ok));
-    
+
     let all_healthy = checks.iter().all(|(_, ok)| *ok);
-    
+
     AutomationHealth {
         is_healthy: all_healthy,
         details: json!({
@@ -153,7 +152,7 @@ async fn check_automation_health() -> AutomationHealth {
                     "status": if ok { "healthy" } else { "unhealthy" }
                 })
             }).collect::<Vec<_>>()
-        })
+        }),
     }
 }
 
@@ -199,13 +198,13 @@ struct DisplayHealth {
 fn check_display_health() -> DisplayHealth {
     // Check if we have access to a display
     let display_available = check_display_available();
-    
+
     DisplayHealth {
         is_healthy: display_available,
         details: json!({
             "display_available": display_available,
             "display_env": std::env::var("DISPLAY").unwrap_or_else(|_| "not_set".to_string())
-        })
+        }),
     }
 }
 
@@ -239,7 +238,7 @@ fn get_memory_usage() -> Value {
 #[cfg(target_os = "linux")]
 fn get_rss_memory() -> u64 {
     use std::fs;
-    
+
     if let Ok(contents) = fs::read_to_string("/proc/self/status") {
         for line in contents.lines() {
             if line.starts_with("VmRSS:") {
@@ -262,14 +261,15 @@ fn get_rss_memory() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::Arc;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_health_check() {
         let response = health_check().await;
         let value: Value = response.0;
-        
+
         assert_eq!(value["status"], "healthy");
         assert_eq!(value["service"], "bytebotd-rs");
         assert!(value["capabilities"].is_array());
@@ -280,7 +280,7 @@ mod tests {
     async fn test_liveness() {
         let response = liveness().await;
         let value: Value = response.0;
-        
+
         assert_eq!(value["status"], "alive");
         assert!(value["timestamp"].is_string());
     }

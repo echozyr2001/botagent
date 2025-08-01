@@ -1,9 +1,12 @@
+use std::{
+    alloc::{GlobalAlloc, Layout, System},
+    sync::atomic::{AtomicUsize, Ordering},
+};
+
 use bytebot_shared_rs::types::task::{Role, Task, TaskPriority, TaskStatus, TaskType};
 use chrono::Utc;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use serde_json::json;
-use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use uuid::Uuid;
 
 // Custom allocator to track memory usage

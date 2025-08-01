@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use axum::{extract::State, http::Method, response::Json, routing::get, Router};
+use bytebot_shared_rs::{middleware::metrics_middleware, MetricsCollector};
+use chrono::Utc;
 use serde_json::{json, Value};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -18,8 +20,6 @@ use crate::{
     routes::{create_auth_routes, create_message_routes, create_task_routes, health::*},
     websocket::WebSocketGateway,
 };
-use bytebot_shared_rs::{MetricsCollector, middleware::metrics_middleware};
-use chrono::Utc;
 
 /// Application state shared across handlers
 #[derive(Clone)]
@@ -36,7 +36,7 @@ pub struct AppState {
 /// Create AppState with all services initialized
 pub async fn create_app_state(config: Arc<Config>) -> Result<AppState, ServiceError> {
     let start_time = Utc::now();
-    
+
     // Initialize metrics collector
     let metrics = Arc::new(
         MetricsCollector::new("bytebot-agent-rs")
@@ -151,7 +151,7 @@ pub fn create_app(state: AppState) -> Router {
                 .route("/api/health/live", get(liveness))
                 .route("/metrics", get(metrics))
                 .route("/api/metrics", get(metrics))
-                .with_state(health_state)
+                .with_state(health_state),
         )
         // Integrate Socket.IO WebSocket server - socketioxide provides its own layer
         .layer(state.websocket_gateway.layer())
@@ -234,12 +234,12 @@ mod tests {
                     .route("/ws-stats", get(|| async { "test" }));
             }
         };
-        
+
         let metrics = Arc::new(
             MetricsCollector::new("test-service")
-                .unwrap_or_else(|_| panic!("Failed to create metrics collector"))
+                .unwrap_or_else(|_| panic!("Failed to create metrics collector")),
         );
-        
+
         let ai_service = Arc::new(UnifiedAIService::new(&config));
         let auth_service: Arc<dyn AuthServiceTrait> = Arc::new(AuthService::new(
             db.get_pool(),

@@ -1,7 +1,9 @@
-use crate::MetricsCollector;
-use serde_json::{json, Value};
 use std::sync::Arc;
+
+use serde_json::{json, Value};
 use tracing::{info, warn};
+
+use crate::MetricsCollector;
 
 /// Monitoring integration for deployment environments
 pub struct MonitoringIntegration {
@@ -276,7 +278,7 @@ impl MonitoringIntegration {
                     }
                 },
                 "spec": self.generate_alert_rules()
-            })
+            }),
         ]
     }
 
@@ -287,7 +289,7 @@ impl MonitoringIntegration {
             metrics_port = 9090,
             "Monitoring setup completed"
         );
-        
+
         info!(
             prometheus_endpoint = "http://localhost:9090/metrics",
             grafana_endpoint = "http://localhost:3000",
@@ -323,9 +325,11 @@ impl MonitoringIntegration {
     }
 
     /// Export monitoring configuration files
-    pub fn export_monitoring_configs(&self, output_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
-        use std::fs;
-        use std::path::Path;
+    pub fn export_monitoring_configs(
+        &self,
+        output_dir: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::{fs, path::Path};
 
         let output_path = Path::new(output_dir);
         fs::create_dir_all(output_path)?;
@@ -370,17 +374,16 @@ impl MonitoringIntegration {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::Arc;
+
+    use super::*;
 
     #[test]
     fn test_monitoring_integration_creation() {
         // Create a mock metrics collector for testing
         if let Ok(metrics) = MetricsCollector::new("test-service") {
-            let monitoring = MonitoringIntegration::new(
-                Arc::new(metrics),
-                "test-service".to_string(),
-            );
+            let monitoring =
+                MonitoringIntegration::new(Arc::new(metrics), "test-service".to_string());
 
             // Test configuration generation
             let prometheus_config = monitoring.generate_prometheus_config();
@@ -403,10 +406,8 @@ mod tests {
     #[test]
     fn test_monitoring_validation() {
         if let Ok(metrics) = MetricsCollector::new("test-service") {
-            let monitoring = MonitoringIntegration::new(
-                Arc::new(metrics),
-                "test-service".to_string(),
-            );
+            let monitoring =
+                MonitoringIntegration::new(Arc::new(metrics), "test-service".to_string());
 
             // Validation should succeed with a working metrics collector
             assert!(monitoring.validate_monitoring_setup().is_ok());

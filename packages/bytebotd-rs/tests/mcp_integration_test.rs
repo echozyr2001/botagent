@@ -204,10 +204,7 @@ async fn test_mcp_tool_descriptions() {
     // Verify all tools have meaningful descriptions
     for (name, description) in &tool_info {
         assert!(!name.is_empty(), "Tool name is empty");
-        assert!(
-            !description.is_empty(),
-            "Tool {name} has empty description"
-        );
+        assert!(!description.is_empty(), "Tool {name} has empty description");
         assert!(
             description.len() > 10,
             "Tool {name} description is too short: {description}"
